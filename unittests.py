@@ -1,6 +1,6 @@
 #!/usr/bin/python
 import unittest
-import migrate_the_oracle_database_stuff as mtods
+import mtods
 
 class MaTestCases(unittest.TestCase):
     def test_startup(self):
