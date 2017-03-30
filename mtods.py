@@ -3,11 +3,11 @@
 MtODS -- _M_igrate _t_he _O_racle _D_atabase _S_tuff
 To our Chado schema, by .. creating excel files, which are then parsed and
 uploaded by MCL.
-
-NOTE For production we should rewrite the 'Full Migration'-option, to start
-threads executing the 'Single Table'-option, as locking all the objects
-passed to the TableGuru might be more work and not necessarily faster.
 '''
+
+#NOTE For production we should rewrite the 'Full Migration'-option, to start
+# threads executing the 'Single Table'-option, as locking all the objects
+# passed to the TableGuru might be more work and not necessarily faster.
 
 # Official libraries.
 import ConfigParser # Reading the table translation file.
@@ -29,9 +29,6 @@ def main():
     '''Read the __doc__ string of this module.'''
     parser = optparse_init()
     o, args = parser.parse_args()
-
-    # Needed for unittests to run their main().
-    sys.argv = [''] 
 
     if args:
         print 'Whts dis? -> "%s" ??' % (args)
@@ -55,9 +52,6 @@ def main():
     if o.config_path:
         table_guru.CONF_PATH = o.config_path
     drush.test_and_configure_drush()
-
-    if o.only_unittests:
-        run_unittests()
 
     # Here we go..
     migra = migration.Migration(verbose=o.verbose, quiet=o.quiet)
@@ -91,9 +85,7 @@ def optparse_init():
         help='update: only get new data from Oracle', metavar='',
         default=False)
 
-    test = optparse.OptionGroup(p, 'Test Options', 'Some Testting utility')
-    test.add_option('-t', '--test', action='store_true', dest='only_unittests',
-        help='only run testCases and exit', metavar='', default=False)
+    test = optparse.OptionGroup(p, 'Debug Options', 'Some Testting utility')
     test.add_option('-n', '--no-upload', action='store_false', dest='do_upload',
         help='do NOT upload the spreadsheed via drush (default: False)',
         metavar='', default=True)
@@ -118,13 +110,6 @@ def optparse_init():
     p.add_option_group(pg_single)
     p.add_option_group(test)
     return p
-
-def run_unittests():
-    '''Runs all unittests in the unittests.py file, and exits.'''
-    import unittests # local file
-    unittests.unittest.main()
-    exit(0)
-
 
 if __name__ == '__main__':
     main()

@@ -62,7 +62,7 @@ class Migration(utility.VerboseQuiet):
     def update(self, basedir=BASE_DIR):
         '''NOT IMPLEMENTED'''
         print self.update.__doc__
-        # TODO implementa me..
+        # TODO Implement the -- update -- task
 
     def full(self, basedir=BASE_DIR, upload=True):
         '''We call the table migration task for all tables in

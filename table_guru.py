@@ -76,13 +76,12 @@ class TableGuru(utility.VerboseQuiet):
 
         sprd = spreadsheet.MCLSpreadsheet()
 
-        # TODO dont know when to create, because noone tells me what those
-        # columns mean..
+        # TODO: Writeon, but dont know when to create, because noone tells me
+        #       what those columns mean..
         #if need_create_db():
         #    sprd.create_db()
         #if need_create_cv():
         #    sprd.create_cv()
-        # TODO: WRITEON
 
     def read_table_translation(self):
         '''Returns the translation dictionary for the current self.table.

@@ -51,7 +51,7 @@ class MCLSpreadsheet():
              content[..][0] | content[..][..] | content[..][N]
              content[M][0]  | content[M][..]  | content[M][N]
 
-        Note: The type(content) may be a list() or a dict(), in later case
+        Note: The type(content[n]) may be a list() or a dict(), in later case
               values are assigned to the columns indicated by the keys
               (numbers/letters).
         '''
@@ -60,40 +60,64 @@ class MCLSpreadsheet():
         if title: ws1.title = title
 
         for n, header in enumerate(headers):
-            c = ws1.cell(1, n)
-            c.value = header
+            ws1.cell(row=0, column=n).value = header
 
         for row in content:
+            if type(row) == dict:
+                row = self.__how_i_understand_dict(ws1, row)
             ws1.append(row)
 
-        self.created_xlsxs += wb
+        self.created_xlsxs.append(wb)
         return wb
 
-    def create_TYPE(self, filename, content, TYPE):
+    def __how_i_understand_dict(self, s, d):
+        '''An change to the openpyxl.worksheet.append function.
+
+        Makes dictionary keys refer to row-0 content, not only coordinate. If a
+        key-matching row-0 column does not exist, we create it.
+        '''
+        headers = [h.value for h in s.rows[0]]
+        new_d = {}
+
+        for key,value in d.iteritems():
+            if key in headers:
+                key = headers.index(key)
+            else:
+                s.cell(row=0, column=len(headers)).value = key
+                headers = [h.value for h in s.rows[0]] # needed for len()
+                key = headers.index(key)
+            new_d[key] = value
+
+        return new_d
+
+    def create_TYPE(self, filename, content, TYPE, sheetname=''):
         '''Create, save, and return a <TYPE> spreadsheet with content.
 
+        If sheetname is set, the sheetname is changed to sheetname.
         The TYPE is an array used as header. We supply some MCL defaults:
             self.DB_HEADERS
             self.CV_HEADERS
             self. ..
 
-        Note: The type(content) may be a list() or a dict(), in later case
+        Note: The type(content[0]) may be a list() or a dict(), in later case
               values are assigned to the columns indicated by the keys
               (numbers/letters).
         '''
         wb = self.__create_xlsx(TYPE, content)
+        if sheetname:
+            wb.get_active_sheet().title = sheetname
         wb.save(filename)
         return wb
 
     def create_db(self, filename, name, description=''):
         '''Convenience wrapper around create_TYPE()'''
-        content = [name, '', '', description]
-        return self.create_TYPE(filename, content, self.DB_HEADERS)
+        content = [[name, '', '', description]]
+        return self.create_TYPE(filename, content, self.DB_HEADERS, 'db')
 
     def create_cv(self, filename, name, description=''):
         '''Convenience wrapper around create_TYPE()'''
-        content = [name, description]
-        return self.create_TYPE(filename, content, self.CV_HEADERS)
+        content = [[name, description]]
+        return self.create_TYPE(filename, content, self.CV_HEADERS, 'cv')
 
     def create_cvterm(self, filename, dbname, cvname, cvterm, accession=[],
         definition=[]):
@@ -122,10 +146,11 @@ class MCLSpreadsheet():
             it = zip(cvterm, accession, definition)
             content = [[dbname, cvname, c, a, d] for c,a,d in it]
 
-        return self.create_TYPE(filename, content, self.CVTERM_HEADERS)
+        return self.create_TYPE(filename, content, self.CVTERM_HEADERS,
+                                'cvterm')
 
+    # We need this function, but MCL has no template for it => chado.py
     #def create_*ORGANISM*():
-        # TODO: We need this function, but MCL has no template for it.
 
     def create_stock(self, filename, name, germplasm_type, genus, species):
         '''Convenience wrapper around create_TYPE()
@@ -133,30 +158,68 @@ class MCLSpreadsheet():
         The 'secondary_ID' will be set equal to name (germplasm name).
         '''
         content = [[g, germplasm_type, genus, species, g] for g in name]
-        return self.create_TYPE(filename, content, self.STOCK_HEADERS)
+        return self.create_TYPE(filename, content, self.STOCK_HEADERS, 'stock')
 
     def create_dataset(self, filename, dataset_name, type, sub='', super=''):
         '''Convenience wrapper around create_TYPE()
         
         A Project/Dataset/Experiment, or just a set of data.
         '''
-        content = [dataset_name, type, sub, super]
-        return self.create_TYPE(filename, content, self.STOCK_HEADERS)
+        content = [[dataset_name, type, sub, super]]
+        return self.create_TYPE(filename, content, self.STOCK_HEADERS,
+                                'dataset')
 
-    def upload_phenotype(self, dataset_name, stock, sample_id, clone_id,
-        descriptors, genus='', species='', contact=''):
+    def create_phenotype(self, filename, dataset_name, stock, descriptors,
+        other=[], genus='', species='', sample_id='', clone_id='', contact=''):
         '''Upload Phenotype Data.
         
         Arguments:
-            - stock, genus, species: If stock is specified, genus and species
-              MIGHT be unambiguous, otherwise they MUST be specified, too.
-            - sample_id: MUST be unique, CAN be constructed from other attrib's
-            - clone_id and contact: CAN be omitted
-            - descriptors
+            stock       If stock is specified, 'genus' and 'species' MIGHT be
+                        unambiguous, otherwise they MUST be specified, too.
+                        This requires direct chado connection..
+            genus       Throws NotImplementedError
+            species     Throws NotImplementedError
+            descriptors An array of dict()s, where the keys are column names
+                        and MUST start with a '#', which is your responsibility
+            other       another array of dict()s like ^
+                        with keys e{ self.PHENO_HEADERS[5:] }
+            sample_id   If omitted, will be contructed from key and value of
+                        the descriptors dict items
+            clone_id    CAN be omitted, or specified via 'other'
+            contact     CAN be omitted, or specified via 'other'
         '''
-        # TODO Writeon..
+        # Reqires Chado.
         #if not genus: genus = ??
         #if not species: species = ??
-        content = []#dataset_name, stock, genus, species, ..
-        return self.create_TYPE(filename, content, self.STOCK_HEADERS)
+        if not genus or not species:
+            msg = 'Need chado connection to find unambiguous germplasms.'
+            raise NotImplementedError(msg)
+        for ds in descriptors:
+            for d in ds.keys():
+                if '#' != d[0]:
+                    msg = 'phenotype descriptor({0}->{1}) must begin with "#"'
+                    msg = msg.format(d, ds[d])
+                    raise StupidUserError(msg)
+
+        content = []
+        if other:
+            for descs, oths in zip(descriptors, other):
+                sid = '{0}_{1}'.format(descs.keys()[0][1:], descs.values()[0])
+                c_dict = {'*dataset_name':dataset_name, '*stock_name':stock,
+                    '*genus':genus, '*species':species, '*sample_ID':sid,
+                    'clone_ID':clone_id, 'evaluator':contact}
+                c_dict.update(descs)
+                c_dict.update(oths)
+                content.append(c_dict)
+        else:
+            for descs in descriptors:
+                sid = '{0}_{1}'.format(descs.keys()[0][1:], descs.values()[0])
+                c_dict = {'*dataset_name':dataset_name, '*stock_name':stock,
+                    '*genus':genus, '*species':species, '*sample_ID':sid,
+                    'clone_ID':clone_id, 'evaluator':contact}
+                c_dict.update(descs)
+                content.append(c_dict)
+
+        return self.create_TYPE(filename, content, self.PHENO_HEADERS,
+                                'phenotype')
 
