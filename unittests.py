@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import unittest
 import spreadsheet
+import chado
 import os
 
 PATH='testpath'
@@ -74,6 +75,18 @@ class SpreadsheetTesting(unittest.TestCase):
             for key in d:
                 self.assertIn(key, headers)
         self.rm(fd)
+
+class PostgreSQLChadoTestting(unittest.TestCase):
+    def test_organism_funcs(self):
+        db = chado.ChadoPostgres(host='127.0.0.1', usr='drupal7')
+        genus = 'test_genus'
+        species = 'test_species'
+        db.create_organism(genus, species)
+        self.assertTrue(db.has_species(species))
+        self.assertTrue(db.has_genus(genus))
+        db.delete_organism(genus, species)
+        self.assertFalse(db.has_species(species))
+        self.assertFalse(db.has_genus(genus))
 
 def run():
     unittest.main()

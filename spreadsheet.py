@@ -3,6 +3,7 @@ speadsheet creation.'''
 
 # Spreadsheet writer (xls + xlsx).
 import openpyxl
+import chado as ChadoModule
 
 class MCLSpreadsheet():
     '''Writes MCL compatible spreadsheets for chado import.'''
@@ -151,6 +152,19 @@ class MCLSpreadsheet():
 
     # We need this function, but MCL has no template for it => chado.py
     #def create_*ORGANISM*():
+    def create_organism(self, genus, species, abbreviation='', common_name='', comment=''):
+        '''Create an organism.
+        
+        Note that this function directly accesses the Chado underlying postgresDB.
+        '''
+        chado = ChadoModule.ChadoPostgres()
+        if chado.has_species(species):
+            msg = 'Tried to create an existing species: {}'.format(species)
+            raise RuntimeError(msg)
+        if chado.has_genus(genus):
+            msg = 'Tried to create an existing genus: {}'.format(genus)
+            raise RuntimeError(msg)
+        chado.create_organism(genus, species, abbreviation, common_name, comment)
 
     def create_stock(self, filename, name, germplasm_type, genus, species):
         '''Convenience wrapper around create_TYPE()

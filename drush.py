@@ -46,7 +46,7 @@ class Drush():
             dump_output('drush_{}.log'.format(command), out, quiet)
         return status, out
 
-def test_and_configure_drush():
+def test_and_configure():
     '''Execute a sample drush comandline and checks the output.
     
     First execution is silent. If we fail, either config is wrong or we need

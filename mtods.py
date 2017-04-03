@@ -19,6 +19,7 @@ import sys
 import drush
 import table_guru
 import migration
+import chado
 
 # Default values.
 BASE_DIR = os.getcwd()
@@ -51,7 +52,14 @@ def main():
         migration.Migration.BASE_DIR = o.basedir
     if o.config_path:
         table_guru.CONF_PATH = o.config_path
-    drush.test_and_configure_drush()
+    drush.test_and_configure()
+
+    if o.pg_user:
+        chado.USER = o.pg_user
+    if o.pg_db:
+        chado.DB = o.pg_db
+    chado.HOST = o.pg_host
+    chado.PORT = o.pg_port
 
     # Here we go..
     migra = migration.Migration(verbose=o.verbose, quiet=o.quiet)
@@ -85,29 +93,40 @@ def optparse_init():
         help='update: only get new data from Oracle', metavar='',
         default=False)
 
-    test = optparse.OptionGroup(p, 'Debug Options', 'Some Testting utility')
+    pgo = optparse.OptionGroup(p, 'Postgres Connection Options', '')
+    pgo.add_option('-y', '--pg_host', action='store', type='string',
+        dest='pg_host', help='postgres hostname, defaults to localhost',
+        metavar='<host>', default=None)
+    pgo.add_option('-p', '--pg_port', action='store', type='string',
+        dest='pg_port', help='postgres port, defaults to 5432', metavar='N',
+        default=None)
+    pgo.add_option('-t', '--pg_user', action='store', type='string',
+        dest='pg_user', help='postgres user, defaults to the current user',
+        metavar='<user>')
+    pgo.add_option('-d', '--pg_db', action='store', type='string',
+        dest='pg_db', help='postgres db, defaults to drupal7', metavar='<db>')
+
+    test = optparse.OptionGroup(p, 'Debug Options', '')
     test.add_option('-n', '--no-upload', action='store_false', dest='do_upload',
         help='do NOT upload the spreadsheed via drush (default: False)',
         metavar='', default=True)
 
     # Full migration options
-    pg_all = optparse.OptionGroup(p, 'Full Migration', 'Options for a full'+\
-        ' migration of all known tables to the Chado database.\nThis is '+\
-        'the default operation.')
-    pg_all.add_option('-b', '--basedir', action='store', type='string',
+    full = optparse.OptionGroup(p, 'Full Migration (default)', '')
+    full.add_option('-b', '--basedir', action='store', type='string',
         dest='basedir', help='default to {}'.format(BASE_DIR),
         metavar='<path>', default=BASE_DIR)
 
     # Single table options
-    pg_single = optparse.OptionGroup(p, 'Single Table Options', 'Only use a'+\
-        ' single specified table instead of all implemented ones.\nThis '+\
-        'gets enabled by supplying the [-s] option.')
-    pg_single.add_option('-s', '--singletab', action='store', type='string',
+    single = optparse.OptionGroup(p, 'Single Table Options', 'Only use a'+\
+     ' single specified table instead of all implemented ones.')
+    single.add_option('-s', '--singletab', action='store', type='string',
         dest='single_table', help='specify only a single table to migrate',
         metavar='<table>', default='')
 
-    p.add_option_group(pg_all)
-    p.add_option_group(pg_single)
+    p.add_option_group(pgo)
+    p.add_option_group(full)
+    p.add_option_group(single)
     p.add_option_group(test)
     return p
 

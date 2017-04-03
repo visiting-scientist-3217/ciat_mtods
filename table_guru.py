@@ -73,11 +73,13 @@ class TableGuru(utility.VerboseQuiet):
     def rake_vm_resumen_enfermedades(self):
         '''That ^ table.'''
         tdict = self.read_table_translation()
-
         sprd = spreadsheet.MCLSpreadsheet()
 
+        raise NotImplementedError('''
         # TODO: Writeon, but dont know when to create, because noone tells me
         #       what those columns mean..
+        ''')
+
         #if need_create_db():
         #    sprd.create_db()
         #if need_create_cv():
