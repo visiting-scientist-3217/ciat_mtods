@@ -8,10 +8,13 @@ class OracleSQLQueries():
     get_table_names = '''\
         SELECT TNAME FROM tab\
     '''
-    get_column_name_type_length_where = '''\
-        SELECT column_name, data_type, data_length
+    get_column_metadata_from = '''\
+        SELECT table_name, column_name, data_type, data_length
             FROM USER_TAB_COLUMNS
             WHERE table_name = '{table_name}'\
+    '''
+    get_all_from = '''\
+        SELECT * FROM {table}\
     '''
 
 class VerboseQuiet():

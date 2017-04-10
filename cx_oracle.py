@@ -12,15 +12,15 @@ Note:
 import cx_Oracle
 import sys
 from getpass import getpass
+import os # environ -> db pw
 
-# Don't worry he said, it's all internal.
+# Don't worry he said, it's all internal he said.
 USR = 'yuca05'
 H_KAPPA = 'kappa.ciat.cgiar.org'
 H_RESEARCH = 'research.ciat.cgiar.org'
 PORT = 1521
 SID_KAPPA = 'CIAT'
 SID_RESEARCH = 'CIAT'
-PW = ''
 SCHEMA = 'YUCA05'
 
 class Oracledb():
@@ -44,14 +44,17 @@ class Oracledb():
 
     def connect(self):
         '''Returns a tuple(connection_obj, cursor_obj).'''
-        # Yes the following 3 if-statements are in the exact right order.
+        # The following 3 if-statements MUST be exactly in this order.
         if not self.DSN:
             self.DSN = cx_Oracle.makedsn(self.HOST, self.PORT, self.SID)
         if self.debug:
             print '[+] connecting ( usr=%s, pw=1234, dsn=%s )' % (self.USR,
                                                                   self.DSN)
         if not self.PW:
-            self.PW = getpass()
+            if os.environ.has_key('ORACLEDB_PW'):
+                self.PW = os.environ['ORACLEDB_PW']
+            else:
+                self.PW = getpass(prompt='Oracledb Password: ')
         con = cx_Oracle.connect(self.USR, self.PW, self.DSN)
         con.current_schema = self.SCHEMA
         cur = con.cursor()

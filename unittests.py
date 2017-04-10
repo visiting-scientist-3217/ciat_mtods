@@ -3,6 +3,9 @@ import unittest
 import spreadsheet
 import chado
 import os
+import cx_oracle
+import table_guru
+import getpass
 
 PATH='testpath'
 
@@ -10,14 +13,14 @@ PATH='testpath'
 if not os.path.exists(PATH):
     os.mkdir(PATH)
 
-class SpreadsheetTesting(unittest.TestCase):
+class SpreadsheetTests(unittest.TestCase):
 
     KEEP_FILES = False
     s = spreadsheet.MCLSpreadsheet()
 
     @staticmethod
     def rm(file):
-        if not SpreadsheetTesting.KEEP_FILES:
+        if not SpreadsheetTests.KEEP_FILES:
             os.remove(file)
 
     def test_cv(self):
@@ -76,7 +79,7 @@ class SpreadsheetTesting(unittest.TestCase):
                 self.assertIn(key, headers)
         self.rm(fd)
 
-class PostgreSQLChadoTestting(unittest.TestCase):
+class PostgreTests(unittest.TestCase):
     def test_organism_funcs(self):
         db = chado.ChadoPostgres(host='127.0.0.1', usr='drupal7')
         genus = 'test_genus'
@@ -87,6 +90,16 @@ class PostgreSQLChadoTestting(unittest.TestCase):
         db.delete_organism(genus, species)
         self.assertFalse(db.has_species(species))
         self.assertFalse(db.has_genus(genus))
+
+class OracleTests(unittest.TestCase):
+    oracledb = cx_oracle.Oracledb()
+    connection, cursor = oracledb.connect()
+    def test_tablegurus_ontology_creation(self):
+        tg = table_guru.TableGuru('VM_RESUMEN_ENFERMEDADES', self.cursor)
+        onto, onto_sp = tg.get_ontologies()
+        self.assertEqual(onto_sp[0].SPANISH, 'Variedad')
+        self.assertEqual(onto_sp[0].COLUMN_EN, 'DESIGNATION')
+        self.assertEqual(len(onto_sp), 31)
 
 def run():
     unittest.main()

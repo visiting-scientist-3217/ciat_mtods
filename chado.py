@@ -4,6 +4,7 @@
 import psycopg2 as psql
 import getpass
 import types # metaprogramming
+import os # environ -> db pw
 
 def copy_func(f, newname):
     return types.FunctionType(
@@ -32,8 +33,12 @@ class ChadoPostgres():
         '''Without host and port, we default to localhost:5432.'''
         # Get db connection.
         self.con = None
+        pw = None
+        if os.environ.has_key('POSTGRES_PW'):
+            pw = os.environ['POSTGRES_PW']
         try:
-            self.con = psql.connect(database=db, user=usr, host=host, port=port)
+            self.con = psql.connect(database=db, user=usr, host=host,
+                port=port, password=pw)
         except psql.OperationalError:
             prompt = '{n}/3 psql connection to {db} as {usr} @'\
                     +' {host}:{port}\nPassword: '

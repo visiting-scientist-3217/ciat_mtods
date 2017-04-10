@@ -9,7 +9,7 @@ import cx_oracle
 
 
 class Migration(utility.VerboseQuiet):
-    '''Handle for the migration task.
+    '''Handler of the migration/translation task.
 
     Tasks are selected by following methods:
         .full()             migrate all known tables
@@ -39,44 +39,47 @@ class Migration(utility.VerboseQuiet):
 
     BASE_DIR = ''
 
-    def __init__(self, verbose=False, quiet=False):
+    def __init__(self, upload=True, verbose=False, quiet=False):
         '''We set some configuration, connect to the database, and create a
         local cursor object.
 
         Arguments:
             verbose     print lots of debug info
             quiet       daemon mode, be silent
+            upload      create AND upload the excel files, default: true
+
+        Writable members:
+            do_upload   intended for unittesting
         '''
         self.VERBOSE = verbose
         self.QUIET = quiet
+        self.do_upload = upload
         self.xlsx_files = []
 
         # NOTE We only need the db connection + cursor in this class to know
         # all table names, and we pass that cursor on to the TableGuru, to
         # avoid making another db connection.
-        self.db = cx_oracle.Oracledb(pw='mruiz') # sneakily hardcoded password
+        self.db = cx_oracle.Oracledb()
         if self.VERBOSE: self.db.debug = True
         self.connection, self.cursor = self.db.connect()
         self.vprint('[+] connected')
 
     def update(self, basedir=BASE_DIR):
-        '''NOT IMPLEMENTED'''
-        print self.update.__doc__
+        '''Update task is not implemented yet.'''
+        raise NotImplementedError(self.update.__doc__)
         # TODO Implement the -- update -- task
 
-    def full(self, basedir=BASE_DIR, upload=True):
+    def full(self, basedir=BASE_DIR):
         '''We call the table migration task for all tables in
         TABLES_MIGRATION_IMPLEMENTED.
 
         Arguments:
             basedir     excel file storage location
-            upload      perform upload task, after creating the excel files
         '''
         if not os.path.exists(basedir):
             raise RuntimeError('[.full] non existent path "{}"'\
                                .format(basedir))
         self.basedir = basedir
-        self.do_upload = upload
         self.vprint('[+] basedir = "{0}", do_upload = {1}'.format(self.basedir,
             self.do_upload))
 

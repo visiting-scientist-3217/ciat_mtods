@@ -1,0 +1,11 @@
+We need to repeatedly update a Chado schema, with data from an OracleDB. This
+is the code for the updater, intended to run via cron. 
+Run ./mtods.py -h and mtods will tell you how to use it.
+
+Environment:
+    POSTGRES_PW     Postgres database password. If not existent, but necessary
+                    for the connection you will be prompted for the password.
+    ORACLEDB_PW     Oracle database password. Same ^ here.
+
+I think its unlikely that this code will be of much use for anyone else.
+

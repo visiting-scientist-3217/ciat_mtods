@@ -1,6 +1,7 @@
 import utility
 from utility import OracleSQLQueries as OSQL
 import spreadsheet
+import cassava_ontology
 
 # Path to the translation cfg file.
 CONF_PATH = ''
@@ -26,11 +27,14 @@ class TableGuru(utility.VerboseQuiet):
         'VM_RESUMEN_EVAL_CALIDAD',
         'VM_RESUMEN_EVAL_MOSCA_BLANCA',
     ]
+    SPANISH_ONTOLOGY_TABLE = 'V_ONTOLOGY_SPANISH'
+    ONTOLOGY_TABLE = 'V_ONTOLOGY'
     
     def __init__(self, table, cursor, verbose=False):
-        '''Initialize ONLY ONCE TableGuru.COLUMNS such that:
-            TableGuru.columns[0][0] -> first  column name
-            TableGuru.columns[1][0] -> second column name
+        '''We initialize (once per session, nor per __init__ call!)
+        TableGuru.COLUMNS such that:
+            TableGuru.COLUMNS[<tablename>][0] -> first  column name
+            TableGuru.COLUMNS[<tablename>][1] -> second column name..
             
         And TableGuru.TRANSLATION_DICT with empty dict()'s.
         '''
@@ -41,13 +45,18 @@ class TableGuru(utility.VerboseQuiet):
         if not TableGuru.COLUMNS:
             for table in TableGuru.ALL_TABLES:
                 self.c.execute(
-                    OSQL.get_column_name_type_length_where.format(
-                        table_name=table
+                    OSQL.get_column_metadata_from.format(table_name=table)
+                )
+                # column_name is the 2nd entry of each tuple, see OSQL
+                TableGuru.COLUMNS[table] = [
+                    line[1] for line in self.c.fetchall()
+                ]
+                self.vprint(
+                    '[+] TableGuru.COLUMNS[{table}] = {res}'.format(
+                        table=table,
+                        res=str(self.COLUMNS[table])[:30]+"... ]"
                     )
                 )
-                TableGuru.COLUMNS[table] = self.c.fetchall()
-                self.vprint('[+] TableGuru.COLUMNS[{table}] = {res}'\
-                    .format(table=table, res=str(TableGuru.COLUMNS[table])[:30]+"... ]"))
 
         # NOTE its not necessary to check this on every __init__ right?
         for table in TableGuru.ALL_TABLES:
@@ -74,16 +83,27 @@ class TableGuru(utility.VerboseQuiet):
         '''That ^ table.'''
         tdict = self.read_table_translation()
         sprd = spreadsheet.MCLSpreadsheet()
+        ontology, ontology_spanish = self.get_ontologies()
 
-        raise NotImplementedError('''
-        # TODO: Writeon, but dont know when to create, because noone tells me
-        #       what those columns mean..
+        raise NotImplementedError('''\
+            # TODO: Writeon, but dont know when to create, because noone tells
+            #       me what those columns mean..\
         ''')
 
         #if need_create_db():
         #    sprd.create_db()
         #if need_create_cv():
         #    sprd.create_cv()
+
+    def get_ontologies(self):
+        '''Returns the two named tuples, with the Ontology data.'''
+        ontology_spanish = cassava_ontology.get_tabledata_as_tuple(
+            self.c, self.SPANISH_ONTOLOGY_TABLE
+        )
+        ontology = cassava_ontology.get_tabledata_as_tuple(
+            self.c, self.ONTOLOGY_TABLE
+        )
+        return ontology, ontology_spanish
 
     def read_table_translation(self):
         '''Returns the translation dictionary for the current self.table.
