@@ -27,8 +27,6 @@ class TableGuru(utility.VerboseQuiet):
         'VM_RESUMEN_EVAL_CALIDAD',
         'VM_RESUMEN_EVAL_MOSCA_BLANCA',
     ]
-    SPANISH_ONTOLOGY_TABLE = 'V_ONTOLOGY_SPANISH'
-    ONTOLOGY_TABLE = 'V_ONTOLOGY'
     
     def __init__(self, table, cursor, verbose=False):
         '''We initialize (once per session, nor per __init__ call!)
@@ -83,7 +81,7 @@ class TableGuru(utility.VerboseQuiet):
         '''That ^ table.'''
         tdict = self.read_table_translation()
         sprd = spreadsheet.MCLSpreadsheet()
-        ontology, ontology_spanish = self.get_ontologies()
+        onto = cassava_ontology.CassavaOntology()
 
         raise NotImplementedError('''\
             # TODO: Writeon, but dont know when to create, because noone tells
@@ -94,16 +92,6 @@ class TableGuru(utility.VerboseQuiet):
         #    sprd.create_db()
         #if need_create_cv():
         #    sprd.create_cv()
-
-    def get_ontologies(self):
-        '''Returns the two named tuples, with the Ontology data.'''
-        ontology_spanish = cassava_ontology.get_tabledata_as_tuple(
-            self.c, self.SPANISH_ONTOLOGY_TABLE
-        )
-        ontology = cassava_ontology.get_tabledata_as_tuple(
-            self.c, self.ONTOLOGY_TABLE
-        )
-        return ontology, ontology_spanish
 
     def read_table_translation(self):
         '''Returns the translation dictionary for the current self.table.

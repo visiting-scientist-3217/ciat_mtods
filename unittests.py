@@ -4,7 +4,7 @@ import spreadsheet
 import chado
 import os
 import cx_oracle
-import table_guru
+import cassava_ontology
 import getpass
 
 PATH='testpath'
@@ -94,12 +94,15 @@ class PostgreTests(unittest.TestCase):
 class OracleTests(unittest.TestCase):
     oracledb = cx_oracle.Oracledb()
     connection, cursor = oracledb.connect()
+    longMessage = True # Append my msg to default msg.
     def test_tablegurus_ontology_creation(self):
-        tg = table_guru.TableGuru('VM_RESUMEN_ENFERMEDADES', self.cursor)
-        onto, onto_sp = tg.get_ontologies()
-        self.assertEqual(onto_sp[0].SPANISH, 'Variedad')
-        self.assertEqual(onto_sp[0].COLUMN_EN, 'DESIGNATION')
-        self.assertEqual(len(onto_sp), 31)
+        cass_onto = cassava_ontology.CassavaOntology(self.cursor)
+        onto, onto_sp = cass_onto.onto, cass_onto.onto_sp
+        cvt0 = 'Numero de plantas cosechadas'
+        self.assertEqual(onto_sp[0].SPANISH, cvt0, 'First cvt changed, bad!')
+        self.assertEqual(onto_sp[0].COLUMN_EN, 'NOHAV')
+        self.assertEqual(len(onto_sp), 24, 'Size changed, interesting!')
+        self.assertEqual(len(onto), len(set(onto)), 'Double entries, bad!')
 
 def run():
     unittest.main()
