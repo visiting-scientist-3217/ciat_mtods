@@ -81,7 +81,7 @@ class TableGuru(utility.VerboseQuiet):
         '''That ^ table.'''
         tdict = self.read_table_translation()
         sprd = spreadsheet.MCLSpreadsheet()
-        onto = cassava_ontology.CassavaOntology()
+        onto = cassava_ontology.CassavaOntology(self.c)
 
         raise NotImplementedError('''\
             # TODO: Writeon, but dont know when to create, because noone tells

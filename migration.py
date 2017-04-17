@@ -25,10 +25,10 @@ class Migration(utility.VerboseQuiet):
 
     # List of Tables, for which a Chado migration is implemented.
     TABLES_MIGRATION_IMPLEMENTED = [
-        'VM_RESUMEN_ENFERMEDADES',
+        'VM_RESUMEN_EVAL_AVANZADAS',
     ]
     TABLES_MIGRATION_NOT_IMPLEMENTED = [
-        'VM_RESUMEN_EVAL_AVANZADAS',
+        'VM_RESUMEN_ENFERMEDADES',
         'VM_RESUMEN_EVAL_CALIDAD',
         'VM_RESUMEN_EVAL_MOSCA_BLANCA',
     ]

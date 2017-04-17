@@ -29,7 +29,19 @@ def get_tabledata_as_tuple(cursor, table):
     return vonto
 
 class CassavaOntology():
-    '''Maybe self-explanatory.'''
+    '''Ontology for the Cassava plant, in spanish and english.
+
+    We also provide utilities for translation.
+
+    Methods:
+        get_ontologies()    Returns (onto, onto_sp)
+
+    Members:
+        onto_sp     Spanish raw ontology
+        onto        English ontology (+cvterm meta info)
+        mapping     Mapping of the spanish ontology names to a list of all
+                    corresponding cvterms as VOntology() objects.
+    '''
 
     SPANISH_ONTOLOGY_TABLE = 'V_ONTOLOGY_SPANISH'
     ONTOLOGY_TABLE = 'V_ONTOLOGY'
@@ -37,7 +49,7 @@ class CassavaOntology():
     def __init__(self, cursor):
         '''We need that cursor.'''
         self.c = cursor
-        self.onto, self.onto_sp = self.get_ontologies()
+        self.onto, self.onto_sp = self.__get_ontologies()
 
         # Get all corresponding cvterm info for the spanish names
         tmp_map = [[i for i in self.onto \
@@ -55,11 +67,14 @@ class CassavaOntology():
         for term in to_remove:
             self.onto_sp.remove(term)
 
-    def get_ontologies(self):
+    def __get_ontologies(self):
         '''Returns the two named tuples, with the Ontology data.'''
         ontology_spanish = get_tabledata_as_tuple(self.c,
             self.SPANISH_ONTOLOGY_TABLE)
         ontology = get_tabledata_as_tuple(self.c, self.ONTOLOGY_TABLE)
+
+    def get_ontologies(self):
+        return self.onto, self.onto_sp
 
         # delete entries we cannot map to cvterm's
         remove_these = []
@@ -71,6 +86,14 @@ class CassavaOntology():
 
         return ontology, ontology_spanish
 
+    def prettyprint_ontology_mapping(method='METHOD_NAME'):
+        '''Pretty-prints the ontology mapping.'''
+        fmt = "{0:25} -> {1}"
+        l = [fmt.format(k,getattr(v[0], method)) for k,v in\
+             self.mapping.iteritems()]
+        for i in l:
+            print l
+
 # So we need to join the ontology_spanish.VARIABLE_ID_BMS on
 # ontology.VARIABLE_ID and after that we should be able to self join ontology
 # on: ontology.TRAIT_ID .SCALE_ID and METHOD_ID
@@ -78,4 +101,4 @@ class CassavaOntology():
 # 'select * from V_ONTOLOGY_SPANISH vos inner join V_ONTOLOGY vo on'\
 # +'vos.VARIABLE_ID_BMS = vo.SCALE_ID order by vo.TRAIT_NAME'
 
-# Buts lets do this in python... #TODO
+# But we did this in python, see CassavaOntology(cursor).mapping
