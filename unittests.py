@@ -101,7 +101,7 @@ class OracleTests(unittest.TestCase):
         cvt0 = 'Numero de plantas cosechadas'
         self.assertEqual(onto_sp[0].SPANISH, cvt0, 'First cvt changed, bad!')
         self.assertEqual(onto_sp[0].COLUMN_EN, 'NOHAV')
-        self.assertEqual(len(onto_sp), 24, 'Size changed, interesting!')
+        self.assertEqual(len(onto_sp), 24, 'Size changed, interesting.')
         self.assertEqual(len(onto), len(set(onto)), 'Double entries, bad!')
 
 def run():

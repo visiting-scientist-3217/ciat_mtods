@@ -2,9 +2,11 @@ import utility
 from utility import OracleSQLQueries as OSQL
 import spreadsheet
 import cassava_ontology
+import ConfigParser
+import os
 
 # Path to the translation cfg file.
-CONF_PATH = ''
+CONF_PATH = 'trans.conf'
 
 class TableGuru(utility.VerboseQuiet):
     '''This guy understands those spanish Oracle databases.
@@ -12,13 +14,16 @@ class TableGuru(utility.VerboseQuiet):
     We get initialized with a table name, and are expected to fill some excel
     workbook, such that MainlabChadoLoader understands it.
 
-    Keys in the TRANSLATION_DICT and COLUMNS_DICT are table names from the
+    Keys in the TRANS and COLUMNS_DICT are table names from the
     Oracle database, and if existent, they return the corresponding Oracle ->
     Chado translation dictionary or the columns of the Oracle table
     rspectively.
+    The TRANS_C dict contains constanst relationships, that have to be
+    populated by asking chado.
     '''
 
-    TRANSLATION_DICT = {}
+    TRANS = {}
+    TRANS_C = {}
     COLUMNS = {}
 
     ALL_TABLES = [
@@ -34,11 +39,12 @@ class TableGuru(utility.VerboseQuiet):
             TableGuru.COLUMNS[<tablename>][0] -> first  column name
             TableGuru.COLUMNS[<tablename>][1] -> second column name..
             
-        And TableGuru.TRANSLATION_DICT with empty dict()'s.
+        And TableGuru.TRANS with empty dict()'s.
         '''
         self.table = table
         self.c = cursor
         self.VERBOSE = verbose
+        self.onto = cassava_ontology.CassavaOntology(self.c)
 
         if not TableGuru.COLUMNS:
             for table in TableGuru.ALL_TABLES:
@@ -59,9 +65,9 @@ class TableGuru(utility.VerboseQuiet):
         # NOTE its not necessary to check this on every __init__ right?
         for table in TableGuru.ALL_TABLES:
             try:
-                tmp = TableGuru.TRANSLATION_DICT[table]
+                tmp = TableGuru.TRANS[table]
             except KeyError:
-                TableGuru.TRANSLATION_DICT[table] = dict()
+                TableGuru.TRANS[table] = dict()
         
     def create_workbooks(self):
         '''Multiplexer for the single rake_{table} functions.
@@ -79,46 +85,90 @@ class TableGuru(utility.VerboseQuiet):
 
     def rake_vm_resumen_enfermedades(self):
         '''That ^ table.'''
-        tdict = self.read_table_translation()
+        tdict = self.get_translation()
         sprd = spreadsheet.MCLSpreadsheet()
-        onto = cassava_ontology.CassavaOntology(self.c)
 
         raise NotImplementedError('''\
             # TODO: Writeon, but dont know when to create, because noone tells
             #       me what those columns mean..\
         ''')
 
+        # Something like..
         #if need_create_db():
         #    sprd.create_db()
         #if need_create_cv():
         #    sprd.create_cv()
 
-    def read_table_translation(self):
+    def rake_vm_resumen_enfermedades(self):
+        '''That ^ table.'''
+        tdict = self.get_translation()
+        sprd = spreadsheet.MCLSpreadsheet()
+
+        raise NotImplementedError('''\
+            # TODO: Writeon, but dont know when to create, because noone tells
+            #       me what those columns mean..\
+        ''')
+
+    def __check_column(self, table, conf, entry):
+        '''Check a single entry in the currently parsed config for correcness.
+        
+        If we cannot handle <entry> for <table> we return False, otherwise True
+        is returned.
+        '''
+        if not TableGuru.COLUMNS.has_key(table):
+            # This is one of the ontology tables.. 
+            # TODO Implement me maybe, but we can ignore this for now.
+            return True
+
+        if entry in TableGuru.COLUMNS[table]:
+            TableGuru.TRANS[self.table][entry] = conf.get(self.table, entry)
+            return True
+        if TableGuru.TRANS_C.has_key(entry):
+            return True
+
+        value = conf.get(self.table, entry)
+        if value[:2] == '/*' and value[-2:] == '*/':
+            value = value.split('/*')[1].split('*/')[0]
+            TableGuru.TRANS_C[entry] = value.lstrip().rstrip()
+            return True
+
+        print '[parser-error] {k} = {v}'.format(k=entry, v=value)
+        return False
+
+    def __parse_translation_config(self):
+        '''We do extensive error checking, and might throw RuntimeError.'''
+        conf = ConfigParser.RawConfigParser()
+
+        if not os.path.exists(CONF_PATH):
+            missing_file = 'TransConfig path does not exist: {}'
+            raise RuntimeError(missing_file.format(CONF_PATH))
+        conf.read(CONF_PATH)
+
+        if not conf.has_section(self.table):
+            missing_sec = 'TransConfig does not have section: {}'
+            raise RuntimeError(missing_sec.format(self.table))
+
+        for table in conf.sections():
+            for column in conf.options(table):
+                col = column.upper() # ConfigParser does .lower() somewhere..
+                if not self.__check_column(table, conf, col):
+                    msg = 'config entry could not be parsed: {0} = {1}'
+                    msg = msg.format(col, conf.get(self.table, col))
+                    raise RuntimeError(msg)
+
+    def get_translation(self):
         '''Returns the translation dictionary for the current self.table.
         
         Note that we save that stuff in static class variables, thus after the
         first invocation, we don't access that file again.
         We also do extensive error checking of that config file.
         '''
-        if not TableGuru.TRANSLATION_DICT:
+        # There must be some manual configuration..
+        if not TableGuru.TRANS[self.table]:
+            self.__parse_translation_config()
 
-            conf = ConfigParser.RawConfigParser()
-            if not os.path.exists(CONF_PATH):
-                missing_file = 'TransConfig path does not exist: {}'
-                raise RuntimeError(missing_file.format(CONF_PATH))
+        # And the ontology..
+        TableGuru.TRANS[self.table].update(self.onto.get_translation())
 
-            conf.read(CONF_PATH)
-            if not conf.has_section(self.table):
-                missing_sec = 'TransConfig does not have section: {}'
-                raise RuntimeError(missing_sec.format(self.table))
-
-            for table in conf.sections():
-                for column in conf.options(table):
-                    if not column in TableGuru.COLUMNS[table]: # aiaiai
-                        unknown_col = 'TransConfig contains unknown column: {}'
-                        raise RuntimeError(unknown_col.format(column))
-                    TableGuru.TRANSLATION_DICT[self.table][column] = \
-                        conf.get(self.table, column)
-
-        return TableGuru.TRANSLATION_DICT[self.table]
+        return TableGuru.TRANS[self.table]
 

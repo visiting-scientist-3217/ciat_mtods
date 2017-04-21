@@ -47,9 +47,11 @@ class CassavaOntology():
     ONTOLOGY_TABLE = 'V_ONTOLOGY'
 
     def __init__(self, cursor):
-        '''We need that cursor.'''
+        '''We need that cursor to the db holding chado.'''
         self.c = cursor
-        self.onto, self.onto_sp = self.__get_ontologies()
+        self.onto_sp = get_tabledata_as_tuple(self.c,
+            self.SPANISH_ONTOLOGY_TABLE)
+        self.onto = get_tabledata_as_tuple(self.c, self.ONTOLOGY_TABLE)
 
         # Get all corresponding cvterm info for the spanish names
         tmp_map = [[i for i in self.onto \
@@ -67,13 +69,8 @@ class CassavaOntology():
         for term in to_remove:
             self.onto_sp.remove(term)
 
-    def __get_ontologies(self):
-        '''Returns the two named tuples, with the Ontology data.'''
-        ontology_spanish = get_tabledata_as_tuple(self.c,
-            self.SPANISH_ONTOLOGY_TABLE)
-        ontology = get_tabledata_as_tuple(self.c, self.ONTOLOGY_TABLE)
-
     def get_ontologies(self):
+        '''Returns the two named tuples, with the Ontology data.'''
         return self.onto, self.onto_sp
 
         # delete entries we cannot map to cvterm's
@@ -93,6 +90,14 @@ class CassavaOntology():
              self.mapping.iteritems()]
         for i in l:
             print l
+
+    def get_translation(self):
+        '''Creates a dict() out of the ontologies, mapping Oracle columns to
+        chado entitys.'''
+        d = dict()
+        for k in self.onto_sp:
+            d.update({k.SPANISH.upper() : 'phenotype.value'})
+        return d
 
 # So we need to join the ontology_spanish.VARIABLE_ID_BMS on
 # ontology.VARIABLE_ID and after that we should be able to self join ontology
