@@ -11,6 +11,9 @@ import cx_oracle
 class Migration(utility.VerboseQuiet):
     '''Handler of the migration/translation task.
 
+    The attribute .only_update decides if we get all data, or only the new data
+    from the Oracle database.
+
     Tasks are selected by following methods:
         .full()             migrate all known tables
             basedir=<default:$PWD>
@@ -18,9 +21,6 @@ class Migration(utility.VerboseQuiet):
         .single(<table>)    migrate <table>
             do_upload=<default:True>
             filename=<default:test.xlsx>
-
-        .update(<since>)    update all known tables, since <since>
-            basedir=<default:$PWD>
     '''
 
     # List of Tables, for which a Chado migration is implemented.
@@ -39,7 +39,7 @@ class Migration(utility.VerboseQuiet):
 
     BASE_DIR = ''
 
-    def __init__(self, upload=True, verbose=False, quiet=False):
+    def __init__(self, upload=True, verbose=False, quiet=False, only_update=False):
         '''We set some configuration, connect to the database, and create a
         local cursor object.
 
@@ -55,6 +55,7 @@ class Migration(utility.VerboseQuiet):
         self.QUIET = quiet
         self.do_upload = upload
         self.xlsx_files = []
+        self.only_update = only_update
 
         # NOTE We only need the db connection + cursor in this class to know
         # all table names, and we pass that cursor on to the TableGuru, to
@@ -63,11 +64,6 @@ class Migration(utility.VerboseQuiet):
         if self.VERBOSE: self.db.debug = True
         self.connection, self.cursor = self.db.connect()
         self.vprint('[+] connected')
-
-    def update(self, basedir=BASE_DIR):
-        '''Update task is not implemented yet.'''
-        raise NotImplementedError(self.update.__doc__)
-        # TODO Implement the -- update -- task
 
     def full(self, basedir=BASE_DIR):
         '''We call the table migration task for all tables in
@@ -103,9 +99,12 @@ class Migration(utility.VerboseQuiet):
               single table. These MUST be uploaded in the given order.
         '''
         tg = table_guru.TableGuru(table, self.cursor, self.VERBOSE)
-        names = tg.create_workbooks()
+        names = tg.create_workbooks(update=self.only_update)
+        if self.xlsx_files:
+            self.vprint('[.create_xlsx_from] clearing self.xlsx_files')
+            self.xlsx_files = []
         for name in names:
-            self.xlsx_files += name
+            self.xlsx_files.append(name)
 
     def upload(self, filename):
         '''Upload the given xlsx file

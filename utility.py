@@ -1,10 +1,31 @@
-'''Utility:
+'''Utility includes:
     - base classes
-    - SQL Querie namespace
+    - SQL Querie namespaces
+    - commonly used functions
+    - ?
 '''
 
+from collections import namedtuple
+def make_namedtuple_with_query(cursor, query, name, data):
+    '''Return <data> as a named tuple, called <name>.
+    
+    Create a named tuple called <name> using <query> and <cursor> to retreive
+    the headers. Then format data with the created tuple and return it.
+
+    Assumptions:
+     - The result of query yields a list/tuple of results, which contain the
+       desired name at position [1], e.g.:
+        [(SomeThing, 'col_name1'), (SomeThing, 'col_name2'), ...]
+     - Data must be iterable
+    '''
+    cursor.execute(query)
+    headers = [i[1] for i in cursor.fetchall()]
+    NTuple = namedtuple(name, headers)
+    result = [NTuple(*r) for r in data]
+    return result
+
 class OracleSQLQueries():
-    '''Namespace for Oracle SQL Queries'''
+    '''Namespace for format()-able Oracle SQL Queries'''
     get_table_names = '''\
         SELECT TNAME FROM tab\
     '''
@@ -17,6 +38,27 @@ class OracleSQLQueries():
     get_all_from = '''\
         SELECT * FROM {table}\
     '''
+
+class PostgreSQLQueries():
+    '''Namespace for format()-able PostgreSQL queries.'''
+    select_all = '''\
+        SELECT * FROM {table}\
+    '''
+    select_all_from_where_eq = '''\
+        SELECT * FROM {table} WHERE {col} = '{name}'\
+    '''
+    insert_into_table = '''\
+        INSERT INTO {table} {columns} VALUES {values}\
+    '''
+    delete_where = '''\
+        DELETE FROM {table} WHERE {cond}\
+    '''
+    column_names = '''\
+        SELECT table_name, column_name
+            FROM information_schema.columns
+            WHERE table_name='{table}'\
+    '''
+
 
 class VerboseQuiet():
     '''To be inherited from.'''

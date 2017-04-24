@@ -64,10 +64,8 @@ def main():
     # Here we go..
     migra = migration.Migration(verbose=o.verbose, quiet=o.quiet)
 
-    if o.do_update:
-        migra.update(basedir=o.basedir)
-    elif o.basedir or not o.single_table:
-        migra.full(basedir=o.basedir, upload=o.do_upload)
+    if o.basedir or not o.single_table:
+        migra.full(basedir=o.basedir, upload=o.do_upload, only_update=o.do_update)
     else:
         migra.single(o.single_table)
 

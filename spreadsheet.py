@@ -3,7 +3,6 @@ speadsheet creation.'''
 
 # Spreadsheet writer (xls + xlsx).
 import openpyxl
-import chado as ChadoModule
 
 class MCLSpreadsheet():
     '''Writes MCL compatible spreadsheets for chado import.'''
@@ -38,8 +37,10 @@ class MCLSpreadsheet():
         'pick_date', 'fiber_pkg', 'storage_time', 'storage_regime', 'comments'
     ]
 
-    def __init__(self):
+    def __init__(self, chado_connection):
+        '''Expecting an initialized database cursor to the chado schema.'''
         self.created_xlsxs = []
+        self.chado = chado_connection
 
     def __create_xlsx(self, headers, content, title=''):
         '''Create a spreadsheet like this:
@@ -102,7 +103,7 @@ class MCLSpreadsheet():
 
         Note: The type(content[0]) may be a list() or a dict(), in later case
               values are assigned to the columns indicated by the keys
-              (numbers/letters).
+              (numbers/keywords).
         '''
         wb = self.__create_xlsx(TYPE, content)
         if sheetname:
@@ -157,7 +158,6 @@ class MCLSpreadsheet():
         
         Note that this function directly accesses the Chado underlying postgresDB.
         '''
-        chado = ChadoModule.ChadoPostgres()
         if chado.has_species(species):
             msg = 'Tried to create an existing species: {}'.format(species)
             raise RuntimeError(msg)
@@ -202,17 +202,26 @@ class MCLSpreadsheet():
             clone_id    CAN be omitted, or specified via 'other'
             contact     CAN be omitted, or specified via 'other'
         '''
-        # Reqires Chado.
-        #if not genus: genus = ??
-        #if not species: species = ??
-        if not genus or not species:
-            msg = 'Need chado connection to find unambiguous germplasms.'
-            raise NotImplementedError(msg)
+        # Disambiguate the organism if necessary.
+        if not genus:
+            orga = chado.get_organism(where="species = '{}'".format(species))
+            if len(orga) == 1:
+                genus = orga[0].genus
+        if not species:
+            orga = chado.get_organism(where="genus = '{}'".format(genus))
+            if len(orga) == 1:
+                species = orga[0].species
+        if not genus and not species:
+            msg = 'Could not disambiguate organism, need genus, species or both'
+            raise RuntimeError(msg)
+
         for ds in descriptors:
             for d in ds.keys():
                 if '#' != d[0]:
                     msg = 'phenotype descriptor({0}->{1}) must begin with "#"'
                     msg = msg.format(d, ds[d])
+                    class StupidUserError(RuntimeError):
+                        pass
                     raise StupidUserError(msg)
 
         content = []

@@ -3,28 +3,32 @@
 
 import psycopg2 as psql
 import getpass
-import types # metaprogramming
-import os # environ -> db pw
-
-def copy_func(f, newname):
-    return types.FunctionType(
-        f.func_code, f.func_globals, newname or f.func_name, f.func_defaults,
-        f.func_closure
-    )
+import types            # used to copy has_.. functions
+import os               # environ -> db pw
+from utility import PostgreSQLQueries as PSQLQ
+from utility import make_namedtuple_with_query
 
 DB='drupal7'
-USER='postgres'
-HOST='localhost'
+USER='drupal7'
+HOST='127.0.0.1'
 PORT=5432
 
 class ChadoPostgres():
     '''You can ask questions about Chado once we have a connection to that
     database.
     
-    Note: Initialization is equal to connection to the database.
-    Note: We create some methods dynamically, namely:
+    Note: Initialization includes connection establishment to the database.
+    Note: We create some methods dynamically.
+
+    All 'has_'-functions return True if <table> contains sth. called <name>.
+    Namely:
         .has_{table}(name)
-            , with {table} e{ self.COMMON_TABLES }
+            , with {table} element [ self.COMMON_TABLES, 'organism' ]
+
+    All 'get_'-functions Return all rows from {table} as namedtuple, with
+    <where> used as where statement. If <where> is empty all rows are returned.
+        .get_{table}(where='')
+            , with {table} element [ self.COMMON_TABLES, 'organism' ]
     '''
     COMMON_TABLES = ['db', 'cv', 'cvterm', 'genotype', 'phenotype', 'project',
                      'stock', 'study']
@@ -39,7 +43,7 @@ class ChadoPostgres():
         try:
             self.con = psql.connect(database=db, user=usr, host=host,
                 port=port, password=pw)
-        except psql.OperationalError:
+        except psql.OperationalError as e:
             prompt = '{n}/3 psql connection to {db} as {usr} @'\
                     +' {host}:{port}\nPassword: '
             i = 1 # 3 tries
@@ -58,42 +62,60 @@ class ChadoPostgres():
 
         self.c = self.con.cursor()
 
-    def tab_contains(self, name, table='', column='name'):
+    def __exe(self, query):
+        '''self.c.execute + self.lastq = fetchall()'''
+        self.c.execute(query)
+        self.lastq = self.c.fetchall()
+        return self.lastq
+
+    def __tab_contains(self, name, table='', column='name'):
         '''Return True if Chado's '{table}' table contains an entry with
         <column> = <name>.'''
         if not table:
             raise RuntimeError('need \'table\' argument')
-        sql = PostgreSQLQueries.select_all_from_where_eq
+        sql = PSQLQ.select_all_from_where_eq
         sql = sql.format(table=table, name=name, col=column)
-        self.c.execute(sql)
-        self.lastq = self.c.fetchall()
+        self.__exe(sql)
+
         if self.lastq:
             return True
         else:
             return False
 
-    def exe(self, query):
-        '''self.c.execute + fetchall'''
-        try:
-            self.c.execute(query)
-            self.lastq = self.c.fetchall()
-            return True
-        except Exception as e:
-            return e
+    def __get_rows(self, table='', where=''):
+        '''Return all rows from {table} as namedtuple, with <where> used as
+        where statement. If where is empty all rows are returned.'''
+        sql = PSQLQ.select_all
+        if where:
+            sql = sql + ' WHERE {where}'
+            sql = sql.format(table=table, where=where)
+        else:
+            sql = sql.format(table=table)
 
+        raw_result = self.__exe(sql)
+        sql = PSQLQ.column_names.format(table=table)
+        result = make_namedtuple_with_query(self.c, sql, table, raw_result)
+
+        return result
+
+    # Following function definitions where made manually, as the column name
+    # differs from the standart name 'name'.
     def has_genus(self, name):
-        '''See tab_contains'''
-        return self.tab_contains(name, table='organism', column='genus')
+        '''See __tab_contains'''
+        return self.__tab_contains(name, table='organism', column='genus')
 
     def has_species(self, name):
-        '''See tab_contains'''
-        return self.tab_contains(name, table='organism', column='species')
+        '''See __tab_contains'''
+        return self.__tab_contains(name, table='organism', column='species')
+
+    #def get_organism(self, genus='', species=''):
+    #    self.__exe(PSQLQ.select_all
 
    
     def create_organism(self, genus, species, abbreviation='', common_name='',
         comment=''):
         '''Create an organism with the given specifications.'''
-        sql = PostgreSQLQueries.insert_into_table
+        sql = PSQLQ.insert_into_table
         columns = '(abbreviation, genus, species, common_name, comment)'
         table = 'organism'
         values = '''('{abr}', '{gen}', '{spec}', '{com_n}', '{com}')'''
@@ -107,7 +129,7 @@ class ChadoPostgres():
 
     def delete_organism(self, genus, species):
         '''Deletes all organisms, with given genus and species.'''
-        sql = PostgreSQLQueries.delete_where
+        sql = PSQLQ.delete_where
         condition = '''genus = '{genus}' and species = '{species}' '''
         condition = condition.format(genus=genus, species=species)
         sql = sql.format(table='organism', cond=condition)
@@ -116,23 +138,35 @@ class ChadoPostgres():
         if not self.con.autocommit:
             self.con.commit()
 
-class PostgreSQLQueries():
-    select_all_from_where_eq = '''\
-        SELECT * FROM {table} WHERE {col} = '{name}'\
-    '''
-    insert_into_table = '''\
-        INSERT INTO {table} {columns} VALUES {values}\
-    '''
-    delete_where = '''\
-        DELETE FROM {table} WHERE {cond}\
-    '''
+# META-BEGIN
+# Metaprogramming helper-function.
+def copy_func(f, newname):
+    return types.FunctionType(
+        f.func_code, f.func_globals, newname or f.func_name, f.func_defaults,
+        f.func_closure
+    )
 
 # Create convenient methods:
 #   .has_db() .has_cv() .has_cvterm() ...
 for table in ChadoPostgres.COMMON_TABLES:
-    newf_name = 'has_'+table
+    prefix = 'has_'
+    newf_name = prefix+table
     if not hasattr(ChadoPostgres, newf_name):
-        newf = copy_func(ChadoPostgres.tab_contains, newf_name)
+        newf = copy_func(ChadoPostgres._ChadoPostgres__tab_contains, newf_name)
         newf.func_defaults = (table,)
-        newf.func_doc = ChadoPostgres.tab_contains.__doc__.format(table=table)
-        setattr(ChadoPostgres, 'has_'+table, newf)
+        newf.func_doc = ChadoPostgres._ChadoPostgres__tab_contains\
+                                     .__doc__.format(table=table)
+        setattr(ChadoPostgres, prefix+table, newf)
+
+# Create convenient methods:
+#   .get_db() .get_cv() .get_..
+for table in ChadoPostgres.COMMON_TABLES + ['organism']:
+    prefix = 'get_'
+    newfget_name = prefix+table
+    if not hasattr(ChadoPostgres, newfget_name):
+        newf = copy_func(ChadoPostgres._ChadoPostgres__get_rows, newfget_name)
+        newf.func_defaults = (table,'')
+        newf.func_doc = ChadoPostgres._ChadoPostgres__get_rows\
+                                     .__doc__.format(table=table)
+        setattr(ChadoPostgres, prefix+table, newf)
+# META-END

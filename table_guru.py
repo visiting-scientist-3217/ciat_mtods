@@ -1,5 +1,6 @@
 import utility
 from utility import OracleSQLQueries as OSQL
+import chado
 import spreadsheet
 import cassava_ontology
 import ConfigParser
@@ -45,6 +46,7 @@ class TableGuru(utility.VerboseQuiet):
         self.c = cursor
         self.VERBOSE = verbose
         self.onto = cassava_ontology.CassavaOntology(self.c)
+        self.chado = chado.ChadoPostgres()
 
         if not TableGuru.COLUMNS:
             for table in TableGuru.ALL_TABLES:
@@ -69,7 +71,7 @@ class TableGuru(utility.VerboseQuiet):
             except KeyError:
                 TableGuru.TRANS[table] = dict()
         
-    def create_workbooks(self):
+    def create_workbooks(self, update=False):
         '''Multiplexer for the single rake_{table} functions.
         
         Each create necessary workbooks for the specified table, save them and
@@ -81,12 +83,13 @@ class TableGuru(utility.VerboseQuiet):
             msg = '[.create_workbooks] table: {0}, func: {1}'
             msg = msg.format(self.table, to_call)
             raise RuntimeError(msg)
-        return func()
+        return func(update)
 
-    def rake_vm_resumen_enfermedades(self):
-        '''That ^ table.'''
+    def rake_vm_resumen_enfermedades(self, update=False):
+        '''Create (and return as list of strings) spreadsheets to upload all
+        data from the Oracle table: VM_RESUMEN_ENFERMEDADES'''
         tdict = self.get_translation()
-        sprd = spreadsheet.MCLSpreadsheet()
+        sprd = spreadsheet.MCLSpreadsheet(self.chado)
 
         raise NotImplementedError('''\
             # TODO: Writeon, but dont know when to create, because noone tells
@@ -99,10 +102,11 @@ class TableGuru(utility.VerboseQuiet):
         #if need_create_cv():
         #    sprd.create_cv()
 
-    def rake_vm_resumen_enfermedades(self):
-        '''That ^ table.'''
+    def rake_vm_resumen_eval_avanzadas(self, update=False):
+        '''Create (and return as string) spreadsheets to upload all data from
+        the Oracle table: VM_RESUMEN_EVAL_AVANZADAS'''
         tdict = self.get_translation()
-        sprd = spreadsheet.MCLSpreadsheet()
+        sprd = spreadsheet.MCLSpreadsheet(self.chado)
 
         raise NotImplementedError('''\
             # TODO: Writeon, but dont know when to create, because noone tells
@@ -156,6 +160,7 @@ class TableGuru(utility.VerboseQuiet):
                     msg = msg.format(col, conf.get(self.table, col))
                     raise RuntimeError(msg)
 
+    # TODO move all the config parsing in a separate class
     def get_translation(self):
         '''Returns the translation dictionary for the current self.table.
         

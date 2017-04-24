@@ -5,7 +5,7 @@ We need to know this for translating the columns to their chado equivalent.
 '''
 
 from collections import namedtuple
-import utility
+from utility import OracleSQLQueries as OSQLQ
 
 def get_tabledata_as_tuple(cursor, table):
     '''Create a list of namedtuple's for <table> with <column_names> as
@@ -15,14 +15,12 @@ def get_tabledata_as_tuple(cursor, table):
         cursor      a PEP 249 compliant cursor pointing to the oracledb
         table       name of the table
     '''
-    sql = utility.OracleSQLQueries.get_column_metadata_from
-    sql = sql.format(table_name=table)
+    sql = OSQLQ.get_column_metadata_from.format(table_name=table)
     cursor.execute(sql)
     column_names = [line[1] for line in cursor.fetchall()]
 
     VOntology = namedtuple('VOntology', column_names)
-    sql = utility.OracleSQLQueries.get_all_from
-    sql = sql.format(table=table)
+    sql = OSQLQ.get_all_from.format(table=table)
     cursor.execute(sql)
     vonto = [VOntology(*line) for line in cursor.fetchall()]
 

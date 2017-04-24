@@ -16,7 +16,8 @@ if not os.path.exists(PATH):
 class SpreadsheetTests(unittest.TestCase):
 
     KEEP_FILES = False
-    s = spreadsheet.MCLSpreadsheet()
+    chado_cursor = chado.ChadoPostgres()
+    s = spreadsheet.MCLSpreadsheet(chado_cursor)
 
     @staticmethod
     def rm(file):
