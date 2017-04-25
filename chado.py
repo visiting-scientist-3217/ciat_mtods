@@ -82,9 +82,13 @@ class ChadoPostgres():
         else:
             return False
 
-    def __get_rows(self, table='', where=''):
-        '''Return all rows from {table} as namedtuple, with <where> used as
-        where statement. If where is empty all rows are returned.'''
+    def __get_rows(self, table='', where='', rawdata=False):
+        '''Return all rows from {table} as namedtuple
+        
+        <where> is used as where statement. If where is empty all rows are
+        returned.
+        If <rawdata> is True, we return the fetched rows as list().
+        '''
         sql = PSQLQ.select_all
         if where:
             sql = sql + ' WHERE {where}'
@@ -93,9 +97,11 @@ class ChadoPostgres():
             sql = sql.format(table=table)
 
         raw_result = self.__exe(sql)
+        if rawdata:
+            return raw_result
+
         sql = PSQLQ.column_names.format(table=table)
         result = make_namedtuple_with_query(self.c, sql, table, raw_result)
-
         return result
 
     # Following function definitions where made manually, as the column name
@@ -165,7 +171,7 @@ for table in ChadoPostgres.COMMON_TABLES + ['organism']:
     newfget_name = prefix+table
     if not hasattr(ChadoPostgres, newfget_name):
         newf = copy_func(ChadoPostgres._ChadoPostgres__get_rows, newfget_name)
-        newf.func_defaults = (table,'')
+        newf.func_defaults = (table,'',False)
         newf.func_doc = ChadoPostgres._ChadoPostgres__get_rows\
                                      .__doc__.format(table=table)
         setattr(ChadoPostgres, prefix+table, newf)

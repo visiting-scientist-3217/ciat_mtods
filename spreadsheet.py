@@ -73,7 +73,7 @@ class MCLSpreadsheet():
         return wb
 
     def __how_i_understand_dict(self, s, d):
-        '''An change to the openpyxl.worksheet.append function.
+        '''A change to the openpyxl.worksheet.append function.
 
         Makes dictionary keys refer to row-0 content, not only coordinate. If a
         key-matching row-0 column does not exist, we create it.
@@ -170,8 +170,16 @@ class MCLSpreadsheet():
         '''Convenience wrapper around create_TYPE()
         
         The 'secondary_ID' will be set equal to name (germplasm name).
+
+        Given a <name> argument as a list of list()'s not a list of strings, we
+        interpret the first[0] entry as the uniquename and the second as the
+        name.
         '''
-        content = [[g, germplasm_type, genus, species, g] for g in name]
+        if len(name[0]) == 2:
+            # given a list() of list()'s, the first element
+            content = [[q, germplasm_type, genus, species, n] for q,n in name]
+        else:
+            content = [[g, germplasm_type, genus, species, g] for g in name]
         return self.create_TYPE(filename, content, self.STOCK_HEADERS, 'stock')
 
     def create_dataset(self, filename, dataset_name, type, sub='', super=''):

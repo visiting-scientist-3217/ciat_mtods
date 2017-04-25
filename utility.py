@@ -32,7 +32,7 @@ class OracleSQLQueries():
     get_column_metadata_from = '''\
         SELECT table_name, column_name, data_type, data_length, COLUMN_ID
             FROM USER_TAB_COLUMNS
-            WHERE table_name = '{table_name}'
+            WHERE table_name = '{table}'
             ORDER BY COLUMN_ID\
     '''
     get_all_from = '''\

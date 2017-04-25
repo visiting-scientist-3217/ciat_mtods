@@ -34,7 +34,7 @@ class TableGuru(utility.VerboseQuiet):
         'VM_RESUMEN_EVAL_MOSCA_BLANCA',
     ]
     
-    def __init__(self, table, cursor, verbose=False):
+    def __init__(self, table, oracledb, verbose=False):
         '''We initialize (once per session, nor per __init__ call!)
         TableGuru.COLUMNS such that:
             TableGuru.COLUMNS[<tablename>][0] -> first  column name
@@ -43,7 +43,8 @@ class TableGuru(utility.VerboseQuiet):
         And TableGuru.TRANS with empty dict()'s.
         '''
         self.table = table
-        self.c = cursor
+        self.oracle = oracledb
+        self.c = oracledb.cur
         self.VERBOSE = verbose
         self.onto = cassava_ontology.CassavaOntology(self.c)
         self.chado = chado.ChadoPostgres()
@@ -51,7 +52,7 @@ class TableGuru(utility.VerboseQuiet):
         if not TableGuru.COLUMNS:
             for table in TableGuru.ALL_TABLES:
                 self.c.execute(
-                    OSQL.get_column_metadata_from.format(table_name=table)
+                    OSQL.get_column_metadata_from.format(table=table)
                 )
                 # column_name is the 2nd entry of each tuple, see OSQL
                 TableGuru.COLUMNS[table] = [
@@ -64,55 +65,6 @@ class TableGuru(utility.VerboseQuiet):
                     )
                 )
 
-        # NOTE its not necessary to check this on every __init__ right?
-        for table in TableGuru.ALL_TABLES:
-            try:
-                tmp = TableGuru.TRANS[table]
-            except KeyError:
-                TableGuru.TRANS[table] = dict()
-        
-    def create_workbooks(self, update=False):
-        '''Multiplexer for the single rake_{table} functions.
-        
-        Each create necessary workbooks for the specified table, save them and
-        returns all their names in an array.
-        '''
-        to_call = 'rake_'+self.table.lower()
-        func = getattr(self, to_call)
-        if not func or not callable(func):
-            msg = '[.create_workbooks] table: {0}, func: {1}'
-            msg = msg.format(self.table, to_call)
-            raise RuntimeError(msg)
-        return func(update)
-
-    def rake_vm_resumen_enfermedades(self, update=False):
-        '''Create (and return as list of strings) spreadsheets to upload all
-        data from the Oracle table: VM_RESUMEN_ENFERMEDADES'''
-        tdict = self.get_translation()
-        sprd = spreadsheet.MCLSpreadsheet(self.chado)
-
-        raise NotImplementedError('''\
-            # TODO: Writeon, but dont know when to create, because noone tells
-            #       me what those columns mean..\
-        ''')
-
-        # Something like..
-        #if need_create_db():
-        #    sprd.create_db()
-        #if need_create_cv():
-        #    sprd.create_cv()
-
-    def rake_vm_resumen_eval_avanzadas(self, update=False):
-        '''Create (and return as string) spreadsheets to upload all data from
-        the Oracle table: VM_RESUMEN_EVAL_AVANZADAS'''
-        tdict = self.get_translation()
-        sprd = spreadsheet.MCLSpreadsheet(self.chado)
-
-        raise NotImplementedError('''\
-            # TODO: Writeon, but dont know when to create, because noone tells
-            #       me what those columns mean..\
-        ''')
-
     def __check_column(self, table, conf, entry):
         '''Check a single entry in the currently parsed config for correcness.
         
@@ -120,8 +72,7 @@ class TableGuru(utility.VerboseQuiet):
         is returned.
         '''
         if not TableGuru.COLUMNS.has_key(table):
-            # This is one of the ontology tables.. 
-            # TODO Implement me maybe, but we can ignore this for now.
+            # This is one of the ontology tables.. We can ignore this for now.
             return True
 
         if entry in TableGuru.COLUMNS[table]:
@@ -176,4 +127,102 @@ class TableGuru(utility.VerboseQuiet):
         TableGuru.TRANS[self.table].update(self.onto.get_translation())
 
         return TableGuru.TRANS[self.table]
+
+    def create_workbooks(self, update=False):
+        '''Multiplexer for the single rake_{table} functions.
+        
+        Each create necessary workbooks for the specified table, save them and
+        returns all their names in an array.
+        '''
+        self.tr = self.get_translation()
+        self.sht = spreadsheet.MCLSpreadsheet(self.chado)
+        sql = OSQL.get_all_from.format(table=self.table)
+        self.data = self.oracle.get_rows(sql, table=self.table)
+
+        # Find an call custom function for each spreadsheet.
+        to_call = 'rake_'+self.table.lower()
+        f = getattr(self, to_call)
+        if not f or not callable(f):
+            msg = '[.create_workbooks] table: {0}, f: {1}'
+            msg = msg.format(self.table, to_call)
+            raise RuntimeError(msg)
+        f(update)
+
+        # Do the thing.
+        sht_paths = []
+        sht_paths += self.__check_and_add_stocks()
+
+        return sht_paths
+
+    def __get_config(self, chado_table=None, oracle_table=None):
+        '''Returns only the (TRANS, TRANS_C) config that match the given
+        arguments.'''
+        if not self.TRANS or not self.TRANS_C:
+            self.tr = self.get_translation()
+
+        t_it = self.tr.itervalues()
+        ct_it = self.TRANS_C.iteritems()
+        if chado_table:
+            trans = [{k:v} for k,v in t_it if v.split('.')[0] == chado_table]
+            ctrans = [{k:v} for k,v in ct_it if v.split('.')[0] == chado_table]
+        if oracle_table:
+            [trans.append({k:v}) for k,v in trans if k == oracle_table]
+            [ctrans.append({k:v}) for k,v in ctrans if k == oracle_table]
+
+        return trans, ctrans
+
+    def __check_and_add_stocks(self):
+        '''Return a list() of created stock-spreadsheets. If none have to be
+        added an empty list is returned.'''
+        sheets = []
+
+        # Get the config, and create according compare-functions.
+        conf, c_conf = self.__get_config(chado_table='stock')
+        def col_equal(ora, chad):
+            for a,b in conf.iteritems():
+                if getattr(ora, a) != getattr(chad, b.split('.')[1]):
+                    return False
+            return True
+        def col_in(ora, chad_list):
+            for c in chad_list:
+                if col_equal(ora, c):
+                    return True
+            return False
+
+        # TODO BAAA, make this ^ single __private function.. almost generic..
+
+        current_stocks = self.chado.get_stock()
+        unknown_stocks = [i for i in self.data if not col_in(i, current_stocks)]
+        stocks = [(i.GID, i.VARIEDAD) for i in unknown_stocks]
+        if stocks:
+            for uniq_name, name in stocks:
+                # i rly want to: self.chado.create_stock(..)
+                sheets.append(self.sht.create_stock(fname, name, germpl, genus,
+                              species))
+        return sheets
+
+    def rake_vm_resumen_enfermedades(self, update=False):
+        '''Create (and return as list of strings) spreadsheets to upload all
+        data from the Oracle table: VM_RESUMEN_ENFERMEDADES'''
+        raise NotImplementedError('''\
+            # TODO: Writeon, but dont know when to create, because noone tells
+            #       me what those columns mean..\
+        ''')
+
+    def rake_vm_resumen_eval_avanzadas(self, update=False):
+        '''Create (and return as string) spreadsheets to upload all data from
+        the Oracle table: VM_RESUMEN_EVAL_AVANZADAS'''
+        raise NotImplementedError('''\
+            # TODO: Writeon, but dont know when to create, because noone tells
+            #       me what those columns mean..\
+        ''')
+
+
+
+# Just fill in some empty dict()'s.
+for table in TableGuru.ALL_TABLES:
+    try:
+        tmp = TableGuru.TRANS[table]
+    except KeyError:
+        TableGuru.TRANS[table] = dict()
 

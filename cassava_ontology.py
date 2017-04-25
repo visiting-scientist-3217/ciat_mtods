@@ -15,7 +15,7 @@ def get_tabledata_as_tuple(cursor, table):
         cursor      a PEP 249 compliant cursor pointing to the oracledb
         table       name of the table
     '''
-    sql = OSQLQ.get_column_metadata_from.format(table_name=table)
+    sql = OSQLQ.get_column_metadata_from.format(table=table)
     cursor.execute(sql)
     column_names = [line[1] for line in cursor.fetchall()]
 

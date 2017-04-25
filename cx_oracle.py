@@ -1,6 +1,8 @@
 #!/usr/bin/python
 '''\
 Sample implementation of the cx_Oracle library.
+We only handle connection establishment, and return a raw connection/cursor
+object.
 
 Usage: {0} <table_name>
 
@@ -13,6 +15,8 @@ import cx_Oracle
 import sys
 from getpass import getpass
 import os # environ -> db pw
+from utility import make_namedtuple_with_query
+from utility import OracleSQLQueries as OSQL
 
 # Don't worry he said, it's all internal he said.
 USR = 'yuca05'
@@ -38,7 +42,7 @@ class Oracledb():
         self.HOST = host
         self.PORT = port
         self.SID = sid
-        self.PW = pw
+        self.__PW = pw
         self.SCHEMA = schema
         self.DSN = dsn
 
@@ -50,15 +54,34 @@ class Oracledb():
         if self.debug:
             print '[+] connecting ( usr=%s, pw=1234, dsn=%s )' % (self.USR,
                                                                   self.DSN)
-        if not self.PW:
+        if not self.__PW:
             if os.environ.has_key('ORACLEDB_PW'):
-                self.PW = os.environ['ORACLEDB_PW']
+                self.__PW = os.environ['ORACLEDB_PW']
             else:
-                self.PW = getpass(prompt='Oracledb Password: ')
-        con = cx_Oracle.connect(self.USR, self.PW, self.DSN)
-        con.current_schema = self.SCHEMA
-        cur = con.cursor()
-        return con, cur
+                self.__PW = getpass(prompt='Oracledb Password: ')
+        self.con = cx_Oracle.connect(self.USR, self.__PW, self.DSN)
+        self.con.current_schema = self.SCHEMA
+        self.cur = self.con.cursor()
+        return self.con, self.cur
+
+    def get_rows(self, sql, table=None, fetchamount=None):
+        '''Execute a <sql>-statement, returns a namedtuple.
+        
+        If <table> is not given we return the raw data, else it is used to
+        fetch the column headers to create the namedtuples.
+        If <fetchamount> is given, only that amount is fetched and returned.
+        '''
+        self.cur.execute(sql.format(table=table))
+        if fetchamount:
+            data = self.cur.fetchmany(fetchamount)
+        else:
+            data = self.cur.fetchall()
+
+        if table:
+            header_sql = OSQL.get_column_metadata_from.format(table=table)
+            return make_namedtuple_with_query(self.cur, header_sql, table, data)
+        else:
+            return data
 
 def main():
     '''<nodoc>'''
