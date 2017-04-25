@@ -45,6 +45,8 @@ class Oracledb():
         self.__PW = pw
         self.SCHEMA = schema
         self.DSN = dsn
+        self.con = None
+        self.cur = None
 
     def connect(self):
         '''Returns a tuple(connection_obj, cursor_obj).'''
@@ -59,9 +61,11 @@ class Oracledb():
                 self.__PW = os.environ['ORACLEDB_PW']
             else:
                 self.__PW = getpass(prompt='Oracledb Password: ')
-        self.con = cx_Oracle.connect(self.USR, self.__PW, self.DSN)
-        self.con.current_schema = self.SCHEMA
-        self.cur = self.con.cursor()
+        if not self.con:
+            self.con = cx_Oracle.connect(self.USR, self.__PW, self.DSN)
+            self.con.current_schema = self.SCHEMA
+        if not self.cur:
+            self.cur = self.con.cursor()
         return self.con, self.cur
 
     def get_rows(self, sql, table=None, fetchamount=None):

@@ -8,6 +8,7 @@ import os
 
 # Path to the translation cfg file.
 CONF_PATH = 'trans.conf'
+GERMPLASM_TYPE = 'cultivar' # constant(3 options) from MCL
 
 class TableGuru(utility.VerboseQuiet):
     '''This guy understands those spanish Oracle databases.
@@ -43,9 +44,11 @@ class TableGuru(utility.VerboseQuiet):
         And TableGuru.TRANS with empty dict()'s.
         '''
         self.table = table
-        self.oracle = oracledb
-        self.c = oracledb.cur
         self.VERBOSE = verbose
+        self.oracle = oracledb
+        if not self.oracle.cur:
+            self.oracle.connect()
+        self.c = oracledb.cur
         self.onto = cassava_ontology.CassavaOntology(self.c)
         self.chado = chado.ChadoPostgres()
 
@@ -160,26 +163,36 @@ class TableGuru(utility.VerboseQuiet):
         if not self.TRANS or not self.TRANS_C:
             self.tr = self.get_translation()
 
-        t_it = self.tr.itervalues()
+        t_it = self.tr.iteritems()
         ct_it = self.TRANS_C.iteritems()
+        # TODO make trans, and ctrans a single dict() not that strange list of dict()'s!
         if chado_table:
-            trans = [{k:v} for k,v in t_it if v.split('.')[0] == chado_table]
+            trans  = [{k:v} for k,v in t_it  if v.split('.')[0] == chado_table]
             ctrans = [{k:v} for k,v in ct_it if v.split('.')[0] == chado_table]
-        if oracle_table:
-            [trans.append({k:v}) for k,v in trans if k == oracle_table]
-            [ctrans.append({k:v}) for k,v in ctrans if k == oracle_table]
+            if oracle_table:
+                trans  = [{k:v} for k,v in trans  if k == oracle_table]
+                ctrans = [{k:v} for k,v in ctrans if k == oracle_table]
+        elif oracle_table:
+            trans  = [{k:v} for k,v in t_it  if k == oracle_table]
+            ctrans = [{k:v} for k,v in ct_it if k == oracle_table]
+        else:
+            class ThisCallDoesNotMakeAnySenseError(RuntimeError):
+                pass
+            raise ThisCallDoesNotMakeAnySenseError('srsly')
 
         return trans, ctrans
 
-    def __check_and_add_stocks(self):
-        '''Return a list() of created stock-spreadsheets. If none have to be
-        added an empty list is returned.'''
-        sheets = []
-
-        # Get the config, and create according compare-functions.
-        conf, c_conf = self.__get_config(chado_table='stock')
+    def __get_compare_f(self, table):
+        '''Using the config file, we create and return compare functions for a
+        given chado table:
+            is_equal(oracle_item, chado_item)
+            is_in(oracle_item, list(chado_item[, ...]))
+        '''
+        # TODO use c_conf!
+        conf, c_conf = self.__get_config(chado_table=table)
         def col_equal(ora, chad):
-            for a,b in conf.iteritems():
+            for d in conf:
+                a,b = next(d.iteritems())
                 if getattr(ora, a) != getattr(chad, b.split('.')[1]):
                     return False
             return True
@@ -188,34 +201,49 @@ class TableGuru(utility.VerboseQuiet):
                 if col_equal(ora, c):
                     return True
             return False
+        return col_equal, col_in
 
-        # TODO BAAA, make this ^ single __private function.. almost generic..
+    def __check_and_add_stocks(self):
+        '''Return a list() of created stock-spreadsheets. If none have to be
+        added an empty list is returned.'''
+        sheets = []
+
+        # Get the config, and create according compare-functions.
+        col_equal, col_in = self.__get_compare_f('stock')
 
         current_stocks = self.chado.get_stock()
         unknown_stocks = [i for i in self.data if not col_in(i, current_stocks)]
         stocks = [(i.GID, i.VARIEDAD) for i in unknown_stocks]
+
         if stocks:
-            for uniq_name, name in stocks:
-                # i rly want to: self.chado.create_stock(..)
-                sheets.append(self.sht.create_stock(fname, name, germpl, genus,
-                              species))
+            # i rly want to: self.chado.create_stock(..)
+            orga = self.chado.get_organism(where="common_name = 'Cassava'")
+            fname = 'stocks.xlsx'
+            germpl_t = GERMPLASM_TYPE
+            self.sht.create_stock(fname, stocks, germpl_t, orga.genus,
+                                  orga.species)
+            sheets.append(fname)
+            self.vprint('[+] adding {file}'.format(file=fname))
+
         return sheets
 
     def rake_vm_resumen_enfermedades(self, update=False):
         '''Create (and return as list of strings) spreadsheets to upload all
-        data from the Oracle table: VM_RESUMEN_ENFERMEDADES'''
-        raise NotImplementedError('''\
+        data from the Oracle table: VM_RESUMEN_ENFERMEDADES
+
             # TODO: Writeon, but dont know when to create, because noone tells
-            #       me what those columns mean..\
-        ''')
+            #       me what those columns mean..
+        '''
+        pass
 
     def rake_vm_resumen_eval_avanzadas(self, update=False):
         '''Create (and return as string) spreadsheets to upload all data from
-        the Oracle table: VM_RESUMEN_EVAL_AVANZADAS'''
-        raise NotImplementedError('''\
+        the Oracle table: VM_RESUMEN_EVAL_AVANZADAS
+
             # TODO: Writeon, but dont know when to create, because noone tells
-            #       me what those columns mean..\
-        ''')
+            #       me what those columns mean..
+        '''
+        pass
 
 
 

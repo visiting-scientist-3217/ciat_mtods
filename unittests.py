@@ -6,8 +6,23 @@ import os
 import cx_oracle
 import cassava_ontology
 import getpass
+import migration
+import table_guru
 
 PATH='testpath'
+
+# Half-Global connections to speed things up a lot.
+# Note that the other test will use these connections.
+class ConTest(unittest.TestCase):
+    chadodb = chado.ChadoPostgres(host='127.0.0.1', usr='drupal7')
+    oracledb = cx_oracle.Oracledb()
+    oracledb.connect()
+    cass_onto = cassava_ontology.CassavaOntology(oracledb.cur)
+    def test_connections_not_none(self):
+        self.assertIsNotNone(self.chadodb)
+        self.assertIsNotNone(self.oracledb)
+        self.assertIsNotNone(self.oracledb.con)
+        self.assertIsNotNone(self.oracledb.cur)
 
 # Sanity checks.
 if not os.path.exists(PATH):
@@ -15,7 +30,7 @@ if not os.path.exists(PATH):
 
 class SpreadsheetTests(unittest.TestCase):
 
-    KEEP_FILES = False
+    KEEP_FILES = True
     chado_cursor = chado.ChadoPostgres()
     s = spreadsheet.MCLSpreadsheet(chado_cursor)
 
@@ -82,28 +97,38 @@ class SpreadsheetTests(unittest.TestCase):
 
 class PostgreTests(unittest.TestCase):
     def test_organism_funcs(self):
-        db = chado.ChadoPostgres(host='127.0.0.1', usr='drupal7')
         genus = 'test_genus'
         species = 'test_species'
-        db.create_organism(genus, species)
-        self.assertTrue(db.has_species(species))
-        self.assertTrue(db.has_genus(genus))
-        db.delete_organism(genus, species)
-        self.assertFalse(db.has_species(species))
-        self.assertFalse(db.has_genus(genus))
+        ConTest.chadodb.create_organism(genus, species)
+        self.assertTrue(ConTest.chadodb.has_species(species))
+        self.assertTrue(ConTest.chadodb.has_genus(genus))
+        ConTest.chadodb.delete_organism(genus, species)
+        self.assertFalse(ConTest.chadodb.has_species(species))
+        self.assertFalse(ConTest.chadodb.has_genus(genus))
 
 class OracleTests(unittest.TestCase):
-    oracledb = cx_oracle.Oracledb()
-    connection, cursor = oracledb.connect()
     longMessage = True # Append my msg to default msg.
+    cass_onto = ConTest.cass_onto
     def test_tablegurus_ontology_creation(self):
-        cass_onto = cassava_ontology.CassavaOntology(self.cursor)
-        onto, onto_sp = cass_onto.onto, cass_onto.onto_sp
+        onto, onto_sp = self.cass_onto.onto, self.cass_onto.onto_sp
         cvt0 = 'Numero de plantas cosechadas'
         self.assertEqual(onto_sp[0].SPANISH, cvt0, 'First cvt changed, bad!')
         self.assertEqual(onto_sp[0].COLUMN_EN, 'NOHAV')
         self.assertEqual(len(onto_sp), 24, 'Size changed, interesting.')
         self.assertEqual(len(onto), len(set(onto)), 'Double entries, bad!')
+
+class GuruTest(unittest.TestCase):
+    longMessage = True # Append my msg to default msg.
+    oracle = ConTest.oracledb
+    t1 = migration.Migration.TABLES_MIGRATION_IMPLEMENTED[0]
+    tg = table_guru.TableGuru(t1, oracle)
+    def test_translation_of_stock(self):
+        self.tg.do_upload = False
+        self.tg.VERBOSE = True
+        sprds = self.tg.create_workbooks()
+        self.assertEqual(sprds[0], stocks.xlsx)
+        for s in sprds:
+            SpreadsheetTests.rm(s)
 
 def run():
     unittest.main()
