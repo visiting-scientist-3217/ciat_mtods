@@ -68,7 +68,7 @@ class Oracledb():
             self.cur = self.con.cursor()
         return self.con, self.cur
 
-    def get_rows(self, sql, table=None, fetchamount=None):
+    def get_rows(self, sql, table=None, fetchamount=None, raw=False):
         '''Execute a <sql>-statement, returns a namedtuple.
         
         If <table> is not given we return the raw data, else it is used to
@@ -81,11 +81,40 @@ class Oracledb():
         else:
             data = self.cur.fetchall()
 
-        if table:
+        if table and not raw:
+            self.lasttable = table
+            self.lastraw = raw
             header_sql = OSQL.get_column_metadata_from.format(table=table)
             return make_namedtuple_with_query(self.cur, header_sql, table, data)
         else:
             return data
+
+    def fetch_more(self, n=None, table=None):
+        '''Fetch more result from the last query, remembering the last output
+        format.'''
+        if not n:
+            data = self.cur.fetchall()
+        else:
+            data = self.cur.fetchmany(n)
+
+        try:
+            raw = self.lastraw
+        except AttributeError:
+            raw = False
+        if raw:
+            return data
+
+        if not table and not raw:
+            try:
+                table = self.lasttable
+            except AttributeError:
+                print '[fetch_more] Could not format data, need <table>'
+                raw = True
+        if table and not raw:
+            self.lasttable = table
+            self.lastraw = raw
+            header_sql = OSQL.get_column_metadata_from.format(table=table)
+            return make_namedtuple_with_query(self.cur, header_sql, table, data)
 
 def main():
     '''<nodoc>'''

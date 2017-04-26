@@ -52,7 +52,6 @@ def main():
         migration.Migration.BASE_DIR = o.basedir
     if o.config_path:
         table_guru.CONF_PATH = o.config_path
-    drush.test_and_configure()
 
     if o.pg_user:
         chado.USER = o.pg_user

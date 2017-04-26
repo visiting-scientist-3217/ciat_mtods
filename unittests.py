@@ -121,12 +121,12 @@ class GuruTest(unittest.TestCase):
     longMessage = True # Append my msg to default msg.
     oracle = ConTest.oracledb
     t1 = migration.Migration.TABLES_MIGRATION_IMPLEMENTED[0]
-    tg = table_guru.TableGuru(t1, oracle)
+    tg = table_guru.TableGuru(t1, oracle, basedir=PATH)
     def test_translation_of_stock(self):
         self.tg.do_upload = False
-        self.tg.VERBOSE = True
-        sprds = self.tg.create_workbooks()
-        self.assertEqual(sprds[0], stocks.xlsx)
+        #self.tg.VERBOSE = True
+        sprds = self.tg.create_workbooks(test=10)
+        self.assertEqual(sprds[0][-11:], 'stocks.xlsx', 'Cannot happen.')
         for s in sprds:
             SpreadsheetTests.rm(s)
 

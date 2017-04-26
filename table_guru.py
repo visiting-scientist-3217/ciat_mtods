@@ -35,7 +35,7 @@ class TableGuru(utility.VerboseQuiet):
         'VM_RESUMEN_EVAL_MOSCA_BLANCA',
     ]
     
-    def __init__(self, table, oracledb, verbose=False):
+    def __init__(self, table, oracledb, verbose=False, basedir=''):
         '''We initialize (once per session, nor per __init__ call!)
         TableGuru.COLUMNS such that:
             TableGuru.COLUMNS[<tablename>][0] -> first  column name
@@ -51,6 +51,7 @@ class TableGuru(utility.VerboseQuiet):
         self.c = oracledb.cur
         self.onto = cassava_ontology.CassavaOntology(self.c)
         self.chado = chado.ChadoPostgres()
+        self.basedir = basedir
 
         if not TableGuru.COLUMNS:
             for table in TableGuru.ALL_TABLES:
@@ -114,73 +115,32 @@ class TableGuru(utility.VerboseQuiet):
                     msg = msg.format(col, conf.get(self.table, col))
                     raise RuntimeError(msg)
 
-    # TODO move all the config parsing in a separate class
-    def get_translation(self):
-        '''Returns the translation dictionary for the current self.table.
-        
-        Note that we save that stuff in static class variables, thus after the
-        first invocation, we don't access that file again.
-        We also do extensive error checking of that config file.
-        '''
-        # There must be some manual configuration..
-        if not TableGuru.TRANS[self.table]:
-            self.__parse_translation_config()
-
-        # And the ontology..
-        TableGuru.TRANS[self.table].update(self.onto.get_translation())
-
-        return TableGuru.TRANS[self.table]
-
-    def create_workbooks(self, update=False):
-        '''Multiplexer for the single rake_{table} functions.
-        
-        Each create necessary workbooks for the specified table, save them and
-        returns all their names in an array.
-        '''
-        self.tr = self.get_translation()
-        self.sht = spreadsheet.MCLSpreadsheet(self.chado)
-        sql = OSQL.get_all_from.format(table=self.table)
-        self.data = self.oracle.get_rows(sql, table=self.table)
-
-        # Find an call custom function for each spreadsheet.
-        to_call = 'rake_'+self.table.lower()
-        f = getattr(self, to_call)
-        if not f or not callable(f):
-            msg = '[.create_workbooks] table: {0}, f: {1}'
-            msg = msg.format(self.table, to_call)
-            raise RuntimeError(msg)
-        f(update)
-
-        # Do the thing.
-        sht_paths = []
-        sht_paths += self.__check_and_add_stocks()
-
-        return sht_paths
-
     def __get_config(self, chado_table=None, oracle_table=None):
         '''Returns only the (TRANS, TRANS_C) config that match the given
         arguments.'''
         if not self.TRANS or not self.TRANS_C:
             self.tr = self.get_translation()
 
-        t_it = self.tr.iteritems()
-        ct_it = self.TRANS_C.iteritems()
-        # TODO make trans, and ctrans a single dict() not that strange list of dict()'s!
-        if chado_table:
-            trans  = [{k:v} for k,v in t_it  if v.split('.')[0] == chado_table]
-            ctrans = [{k:v} for k,v in ct_it if v.split('.')[0] == chado_table]
-            if oracle_table:
-                trans  = [{k:v} for k,v in trans  if k == oracle_table]
-                ctrans = [{k:v} for k,v in ctrans if k == oracle_table]
-        elif oracle_table:
-            trans  = [{k:v} for k,v in t_it  if k == oracle_table]
-            ctrans = [{k:v} for k,v in ct_it if k == oracle_table]
-        else:
-            class ThisCallDoesNotMakeAnySenseError(RuntimeError):
-                pass
-            raise ThisCallDoesNotMakeAnySenseError('srsly')
+        def fill_with_cond(cond, c=None, o=None):
+            tr = {}
+            ctr = {}
+            t_it = self.tr.iteritems()
+            ct_it = self.TRANS_C.iteritems()
+            [tr.update({k:v}) for k,v in t_it if eval(cond)]
+            [ctr.update({k:v}) for k,v in ct_it if eval(cond)]
+            return tr, ctr
 
-        return trans, ctrans
+        if chado_table and oracle_table:
+            tr, ctr = fill_with_cond("v.split('.')[0] == c and k == o",
+                                     chado_table, oracle_table)
+        if chado_table:
+            tr, ctr = fill_with_cond("v.split('.')[0] == c", chado_table)
+        elif oracle_table:
+            tr, ctr = fill_with_cond("k == o", oracle_table)
+        else:
+            raise RuntimeError('Must supply either chado_table or oracle_table')
+
+        return tr, ctr
 
     def __get_compare_f(self, table):
         '''Using the config file, we create and return compare functions for a
@@ -188,11 +148,10 @@ class TableGuru(utility.VerboseQuiet):
             is_equal(oracle_item, chado_item)
             is_in(oracle_item, list(chado_item[, ...]))
         '''
-        # TODO use c_conf!
+        # TODO use c_conf
         conf, c_conf = self.__get_config(chado_table=table)
         def col_equal(ora, chad):
-            for d in conf:
-                a,b = next(d.iteritems())
+            for a,b in conf.iteritems():
                 if getattr(ora, a) != getattr(chad, b.split('.')[1]):
                     return False
             return True
@@ -217,21 +176,66 @@ class TableGuru(utility.VerboseQuiet):
 
         if stocks:
             # i rly want to: self.chado.create_stock(..)
-            orga = self.chado.get_organism(where="common_name = 'Cassava'")
-            fname = 'stocks.xlsx'
+            orga = self.chado.get_organism(where="common_name = 'Cassava'")[0]
+            fname = os.path.join(self.basedir, 'stocks.xlsx')
             germpl_t = GERMPLASM_TYPE
             self.sht.create_stock(fname, stocks, germpl_t, orga.genus,
                                   orga.species)
             sheets.append(fname)
-            self.vprint('[+] adding {file}'.format(file=fname))
+            self.vprint('[+] adding {}'.format(fname))
 
         return sheets
+
+    # TODO move all the config parsing in a separate class
+    def get_translation(self):
+        '''Returns the translation dictionary for the current self.table.
+        
+        Note that we save that stuff in static class variables, thus after the
+        first invocation, we don't access that file again.
+        We also do extensive error checking of that config file.
+        '''
+        # There must be some manual configuration..
+        if not TableGuru.TRANS[self.table]:
+            self.__parse_translation_config()
+
+        # And the ontology..
+        TableGuru.TRANS[self.table].update(self.onto.get_translation())
+
+        return TableGuru.TRANS[self.table]
+
+    def create_workbooks(self, update=False, test=None):
+        '''Multiplexer for the single rake_{table} functions.
+        
+        Each create necessary workbooks for the specified table, save them and
+        returns all their names in an array.
+        '''
+        self.tr = self.get_translation()
+        self.sht = spreadsheet.MCLSpreadsheet(self.chado)
+        sql = OSQL.get_all_from.format(table=self.table)
+        self.data = self.oracle.get_rows(sql, table=self.table,
+                                         fetchamount=test)
+
+        # Find an call custom function for each spreadsheet.
+        to_call = 'rake_'+self.table.lower()
+        f = getattr(self, to_call)
+        if not f or not callable(f):
+            msg = '[.create_workbooks] table: {0}, f: {1}'
+            msg = msg.format(self.table, to_call)
+            raise RuntimeError(msg)
+        f(update)
+
+        # Do the thing.
+        sht_paths = []
+        sht_paths += self.__check_and_add_stocks()
+        #sht_paths += self.__check_and_add_?()
+
+        return sht_paths
 
     def rake_vm_resumen_enfermedades(self, update=False):
         '''Create (and return as list of strings) spreadsheets to upload all
         data from the Oracle table: VM_RESUMEN_ENFERMEDADES
 
-            # TODO: Writeon, but dont know when to create, because noone tells
+            #     : Writeon, but dont know when to create, because noone tells
             #       me what those columns mean..
         '''
         pass
@@ -240,7 +244,7 @@ class TableGuru(utility.VerboseQuiet):
         '''Create (and return as string) spreadsheets to upload all data from
         the Oracle table: VM_RESUMEN_EVAL_AVANZADAS
 
-            # TODO: Writeon, but dont know when to create, because noone tells
+            #     : Writeon, but dont know when to create, because noone tells
             #       me what those columns mean..
         '''
         pass

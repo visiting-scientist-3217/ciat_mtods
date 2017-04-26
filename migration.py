@@ -98,7 +98,8 @@ class Migration(utility.VerboseQuiet):
         Note: We might create multiple worksheets, even when only migrating a
               single table. These MUST be uploaded in the given order.
         '''
-        tg = table_guru.TableGuru(table, self.db, self.VERBOSE)
+        tg = table_guru.TableGuru(table, self.db, self.VERBOSE,
+                                  basedir=self.basedir)
         names = tg.create_workbooks(update=self.only_update)
         if self.xlsx_files:
             self.vprint('[.create_xlsx_from] clearing self.xlsx_files')

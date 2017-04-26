@@ -90,7 +90,7 @@ class CassavaOntology():
             print l
 
     def get_translation(self):
-        '''Creates a dict() out of the ontologies, mapping Oracle columns to
+        '''Return a dict() out of the ontologies, mapping Oracle columns to
         chado entitys.'''
         d = dict()
         for k in self.onto_sp:
