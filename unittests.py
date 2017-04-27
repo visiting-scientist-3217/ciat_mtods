@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import unittest
+from unittest_helper import PostgreRestorer as PGR
 import spreadsheet
 import chado
 import os
@@ -122,13 +123,21 @@ class GuruTest(unittest.TestCase):
     oracle = ConTest.oracledb
     t1 = migration.Migration.TABLES_MIGRATION_IMPLEMENTED[0]
     tg = table_guru.TableGuru(t1, oracle, basedir=PATH)
+    pgr = PGR()
     def test_translation_of_stock(self):
         self.tg.do_upload = False
         #self.tg.VERBOSE = True
-        sprds = self.tg.create_workbooks(test=10)
-        self.assertEqual(sprds[0][-11:], 'stocks.xlsx', 'Cannot happen.')
-        for s in sprds:
+        self.sprds += self.tg.create_workbooks(test=10)
+        self.assertEqual(self.sprds[0][-11:], 'stocks.xlsx', 'Cannot happen.')
+    def test_stock_upload(self):
+        # TODO implement the upload test, remember to rollback the database
+        # with self.pgr.dump() .restore()
+        pass
+    def test_cleanup(self):
+        '''Not a test, just cleanup.'''
+        for s in self.sprds:
             SpreadsheetTests.rm(s)
+
 
 def run():
     unittest.main()

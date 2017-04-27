@@ -99,7 +99,8 @@ class Migration(utility.VerboseQuiet):
               single table. These MUST be uploaded in the given order.
         '''
         tg = table_guru.TableGuru(table, self.db, self.VERBOSE,
-                                  basedir=self.basedir)
+                                  basedir=self.basedir,
+                                  update=self.only_update)
         names = tg.create_workbooks(update=self.only_update)
         if self.xlsx_files:
             self.vprint('[.create_xlsx_from] clearing self.xlsx_files')

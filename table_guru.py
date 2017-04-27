@@ -35,7 +35,7 @@ class TableGuru(utility.VerboseQuiet):
         'VM_RESUMEN_EVAL_MOSCA_BLANCA',
     ]
     
-    def __init__(self, table, oracledb, verbose=False, basedir=''):
+    def __init__(self, table, oracledb, verbose=False, basedir='', update=True):
         '''We initialize (once per session, nor per __init__ call!)
         TableGuru.COLUMNS such that:
             TableGuru.COLUMNS[<tablename>][0] -> first  column name
@@ -52,6 +52,7 @@ class TableGuru(utility.VerboseQuiet):
         self.onto = cassava_ontology.CassavaOntology(self.c)
         self.chado = chado.ChadoPostgres()
         self.basedir = basedir
+        self.update = update
 
         if not TableGuru.COLUMNS:
             for table in TableGuru.ALL_TABLES:
@@ -167,12 +168,14 @@ class TableGuru(utility.VerboseQuiet):
         added an empty list is returned.'''
         sheets = []
 
-        # Get the config, and create according compare-functions.
-        col_equal, col_in = self.__get_compare_f('stock')
-
-        current_stocks = self.chado.get_stock()
-        unknown_stocks = [i for i in self.data if not col_in(i, current_stocks)]
-        stocks = [(i.GID, i.VARIEDAD) for i in unknown_stocks]
+        if self.update:
+            # Get the config, and create according compare-functions.
+            is_equal, is_in = self.__get_compare_f('stock')
+            current_stocks = self.chado.get_stock()
+            unknown = [i for i in self.data if not is_in(i, current_stocks)]
+        else:
+            unknown = self.data
+        stocks = [(i.GID, i.VARIEDAD) for i in unknown]
 
         if stocks:
             # i rly want to: self.chado.create_stock(..)
@@ -186,7 +189,6 @@ class TableGuru(utility.VerboseQuiet):
 
         return sheets
 
-    # TODO move all the config parsing in a separate class
     def get_translation(self):
         '''Returns the translation dictionary for the current self.table.
         
@@ -203,7 +205,7 @@ class TableGuru(utility.VerboseQuiet):
 
         return TableGuru.TRANS[self.table]
 
-    def create_workbooks(self, update=False, test=None):
+    def create_workbooks(self, test=None):
         '''Multiplexer for the single rake_{table} functions.
         
         Each create necessary workbooks for the specified table, save them and
@@ -222,16 +224,17 @@ class TableGuru(utility.VerboseQuiet):
             msg = '[.create_workbooks] table: {0}, f: {1}'
             msg = msg.format(self.table, to_call)
             raise RuntimeError(msg)
-        f(update)
+        f()
 
         # Do the thing.
         sht_paths = []
         sht_paths += self.__check_and_add_stocks()
         #sht_paths += self.__check_and_add_?()
+        # TODO Write on, after stock we add ... ? phenotypes?
 
         return sht_paths
 
-    def rake_vm_resumen_enfermedades(self, update=False):
+    def rake_vm_resumen_enfermedades(self):
         '''Create (and return as list of strings) spreadsheets to upload all
         data from the Oracle table: VM_RESUMEN_ENFERMEDADES
 
@@ -240,7 +243,7 @@ class TableGuru(utility.VerboseQuiet):
         '''
         pass
 
-    def rake_vm_resumen_eval_avanzadas(self, update=False):
+    def rake_vm_resumen_eval_avanzadas(self):
         '''Create (and return as string) spreadsheets to upload all data from
         the Oracle table: VM_RESUMEN_EVAL_AVANZADAS
 

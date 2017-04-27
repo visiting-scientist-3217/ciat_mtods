@@ -24,7 +24,7 @@ import chado
 # Default values.
 BASE_DIR = os.getcwd()
 CONF_FILENAME = 'trans.conf'
-table_guru.CONF_PATH = BASE_DIR + CONF_FILENAME
+table_guru.CONF_PATH = os.path.join(BASE_DIR, CONF_FILENAME)
 
 def main():
     '''Read the __doc__ string of this module.'''
@@ -32,7 +32,7 @@ def main():
     o, args = parser.parse_args()
 
     if args:
-        print 'Whts dis? -> "%s" ??' % (args)
+        print 'Unknown argument: "{}"'.format(args)
         exit(1)
 
     # Check user input for crap.

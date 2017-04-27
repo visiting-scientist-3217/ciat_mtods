@@ -3,6 +3,7 @@ speadsheet creation.'''
 
 # Spreadsheet writer (xls + xlsx).
 import openpyxl
+import os
 
 class MCLSpreadsheet():
     '''Writes MCL compatible spreadsheets for chado import.'''
@@ -108,6 +109,8 @@ class MCLSpreadsheet():
         wb = self.__create_xlsx(TYPE, content)
         if sheetname:
             wb.get_active_sheet().title = sheetname
+        if not os.path.exists(os.path.dirname(filename)):
+            os.makedirs(os.path.dirname(filename))
         wb.save(filename)
         return wb
 
