@@ -35,7 +35,10 @@ class ChadoPostgres():
 
     def __init__(self, db=DB, usr=USER, host=HOST, port=PORT):
         '''Without host and port, we default to localhost:5432.'''
-        # Get db connection.
+        self.__connect(db, usr, host, port)
+
+    def __connect(self, db, usr, host, port):
+        '''Establish the connection.'''
         self.con = None
         pw = None
         if os.environ.has_key('POSTGRES_PW'):

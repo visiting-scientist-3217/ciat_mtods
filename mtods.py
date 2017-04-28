@@ -45,6 +45,7 @@ def main():
         if a[0] and b[0]:
             parser.error(mutally_exclusive_msg.format(a[1],b[1]))
 
+    drush.DEFAULT_USR = o.drupal_usr
     if o.drush_root:
         drush.Drush.DRUPAL_PATH = o.drush_root
     if o.basedir:
@@ -82,6 +83,9 @@ def optparse_init():
     p.add_option('-r', '--drush-root', action='store', type='string',
         dest='drush_root', help='root dir of drupal installation',
         metavar='<path>', default='')
+    p.add_option('--drupal-user', action='store', type='string',
+        dest='drupal_usr', help='drupal user, must be able to execute MCL drush'\
+        +'commands', metavar='<usr>', default='admin')
     p.add_option('-c', '--config', action='store', type='string',
         dest='config_path', help=\
         'path to the table translation config (default: {})'\

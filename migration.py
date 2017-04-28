@@ -56,6 +56,7 @@ class Migration(utility.VerboseQuiet):
         self.do_upload = upload
         self.xlsx_files = []
         self.only_update = only_update
+        self.drush = drush.Drush()
 
         # NOTE We only need the db connection + cursor in this class to know
         # all table names, and we pass that cursor on to the TableGuru, to
@@ -89,8 +90,8 @@ class Migration(utility.VerboseQuiet):
         # Following call appends created filenames to self.xlsx_files
         self.create_xlsx_from(table)
         if self.do_upload:
-            for xlsx_file in self.xlsx_files:
-                self.upload(xlsx_file)
+            for f in self.xlsx_files:
+                self.upload(f)
 
     def create_xlsx_from(self, table):
         '''Does excactly that.
@@ -108,24 +109,29 @@ class Migration(utility.VerboseQuiet):
         for name in names:
             self.xlsx_files.append(name)
 
-    def upload(self, filename):
-        '''Upload the given xlsx file
+    def upload(self, fname=''):
+        '''Upload the given xlsx file.
 
         We upload by calling `drush` with some args.
 
         Note: We SHOULD bypass drush + MCL + Excel all along, and just put all
               mannually into the Chado tables.
         '''
-        if not filename:
-            raise RuntimeError('[.upload] no *.xlsx filename + no xlrd object')
-        if filename[4:] != 'xlsx':
-            self.qprint('[.upload] filename does not end in xlsx')
+        if not fname:
+            raise RuntimeError('[.upload] no *.xlsx fname + no xlrd object')
+        if fname[-4:] != 'xlsx':
+            self.qprint('[.upload] fname does not end in xlsx')
+        if not fname[0] == os.path.sep:
+            fname = os.path.join(os.getcwd(), fname)
 
-        for fname in self.xlsx_files:
-            status, out = drush.Drush.execute(drush.Drush.MCL_UPLOAD, fname)
-            if status != 0:
-                qprint('[.upload] drush failed with: {0} {1}',
-                    drush.Drush.MCL_UPLOAD, fname)
+        status, out = self.drush.mcl_upload(fname)
+
+        if status != 0:
+            qprint('[.upload] drush failed with: {0} {1}',
+                self.drush.MCL_UPLOAD.format(file=fname))
+        else:
+            self.vprint('[+] drush cmd successfull:\n{}'.format(out))
+        return (status, out, fname)
 
     def get_tables(self):
         self.cursor.execute(utility.OracleSQLQueries.get_table_names)

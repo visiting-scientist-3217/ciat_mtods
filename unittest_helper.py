@@ -13,7 +13,7 @@ class PostgreRestorer():
     c_dump = 'sudo -u postgres pg_dump -Fc {db}'
     c_drop = 'sudo -u postgres dropdb {db}'
     c_crea = 'sudo -u postgres createdb {db}'
-    c_res = 'sudo -u postgres pg_restore --dbname={db} {dumpfile}'
+    c_res = 'sudo -u postgres pg_restore --dbname={db} '
 
     # Outside of project folder cuz of paranoia.
     MASTERDUMP = os.path.join(os.path.expanduser('~'), 'ciat', 'ALLDB.dump')
@@ -24,10 +24,8 @@ class PostgreRestorer():
         if os.path.exists(self.dumpfile):
             now = time.strftime('%m_%d_%H-%M-%S_', time.localtime())
             self.dumpfile = now + self.dumpfile
-        self.c_dump = self.c_dump.format(db=db)
-        self.c_drop = self.c_drop.format(db=db)
-        self.c_crea = self.c_crea.format(db=db)
-        self.c_res = self.c_res.format(db=db, dumpfile=self.dumpfile)
+        self.db = db
+
         self.__check_masterdump()
 
     def __check_masterdump(self, days=2):
@@ -44,6 +42,7 @@ class PostgreRestorer():
 
     def __exe_c(self, cmd):
         '''Print execute, and throw on non-0 return value.'''
+        cmd = cmd.format(db=self.db)
         s, o = getstatusoutput(cmd)
         if s != 0:
             msg = 'Could not execute cmd $({cmd}) returned "{val}":\n{out}'
@@ -64,5 +63,5 @@ class PostgreRestorer():
         '''Restore current chado data of our DB.'''
         self.__exe_c(self.c_drop)
         self.__exe_c(self.c_crea)
-        self.__exe_c(self.c_res)
+        self.__exe_c(self.c_res + self.dumpfile)
 
