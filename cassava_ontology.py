@@ -81,13 +81,13 @@ class CassavaOntology():
 
         return ontology, ontology_spanish
 
-    def prettyprint_ontology_mapping(method='METHOD_NAME'):
+    def prettyprint_ontology_mapping(self, method='METHOD_NAME'):
         '''Pretty-prints the ontology mapping.'''
         fmt = "{0:25} -> {1}"
         l = [fmt.format(k,getattr(v[0], method)) for k,v in\
              self.mapping.iteritems()]
         for i in l:
-            print l
+            print i
 
     def get_translation(self):
         '''Return a dict() out of the ontologies, mapping Oracle columns to

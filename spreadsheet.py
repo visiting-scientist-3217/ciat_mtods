@@ -4,6 +4,7 @@ speadsheet creation.'''
 # Spreadsheet writer (xls + xlsx).
 import openpyxl
 import os
+import re
 
 class MCLSpreadsheet():
     '''Writes MCL compatible spreadsheets for chado import.'''
@@ -25,6 +26,10 @@ class MCLSpreadsheet():
         'maternal_parent', 'mutation_parent', 'selfing_parent', 'alias',
         'cultivar', 'pedigree', 'origin', 'population_size',
         'germplasm_center', 'comments', 'image', 'reference'
+    ]
+    GEOLOCATION_HEADERS = [
+        '*site_name', 'latitude', 'longitude', 'altitude', 'geodetic_datum',
+        'type', 'country', 'state', 'region', 'address', 'comments'
     ]
     DATASET_HEADERS = [
         '*dataset_name', '*type', 'sub_type', 'super_dataset',
@@ -193,6 +198,39 @@ class MCLSpreadsheet():
         content = [[dataset_name, type, sub, super]]
         return self.create_TYPE(filename, content, self.STOCK_HEADERS,
                                 'dataset')
+
+    def create_geolocation(self, filename, names, alts, lats, longs,
+        fmt='NSEW'):
+        '''Convenience wrapper around create_TYPE()
+        
+        Create a nd_geolocation entry.
+        The coordinates must be either given with a '+' or a '-' sign,
+        indicating NS, and EW; or appended NSEW, depinding on the fmt=
+        argument, which is either '+-' or 'NSEW'.
+        '''
+        if not fmt in ['NSEW', '+-']:
+            raise RuntimeError('[.create_geolocation] fmt wrong')
+
+        # Strip leading whitespace, leading zeroes, and substitute N E S W..
+        if fmt == 'NSEW':
+            for crdl in [alts, lats, longs]:
+                for crd in crdl:
+                    try:
+                        idx = crdl.index(crd)
+                        crdl[idx] = re.sub(r'^\s*0*', '', crdl[idx])
+                        crdl[idx] = re.sub(r'([0-9]*)[NE]', '+\\1', crdl[idx])
+                        crdl[idx] = re.sub(r'([0-9]*)[SW]', '-\\1', crdl[idx])
+                    except TypeError, ValueError:
+                        # Either we found a plain int() or the first
+                        # substitution was already successfull, and the second
+                        # fails, which is both fine.
+                        continue
+
+        it = zip(names, alts, lats, longs)
+        content = [[na, al, la, lo] for na,al,la,lo in it]
+
+        return self.create_TYPE(filename, content, self.GEOLOCATION_HEADERS,
+                                'site')
 
     def create_phenotype(self, filename, dataset_name, stock, descriptors,
         other=[], genus='', species='', sample_id='', clone_id='', contact=''):

@@ -23,12 +23,14 @@ class ChadoPostgres():
     All 'has_'-functions return True if <table> contains sth. called <name>.
     Namely:
         .has_{table}(name)
-            , with {table} element [ self.COMMON_TABLES, 'organism' ]
+            , with {table} element [self.COMMON_TABLES, 'organism',
+                                    'nd_geolocation']
 
     All 'get_'-functions Return all rows from {table} as namedtuple, with
     <where> used as where statement. If <where> is empty all rows are returned.
         .get_{table}(where='')
-            , with {table} element [ self.COMMON_TABLES, 'organism' ]
+            , with {table} element [self.COMMON_TABLES, 'organism',
+                                    'nd_geolocation']
     '''
     COMMON_TABLES = ['db', 'cv', 'cvterm', 'genotype', 'phenotype', 'project',
                      'stock', 'study']
@@ -117,6 +119,10 @@ class ChadoPostgres():
         '''See __tab_contains'''
         return self.__tab_contains(name, table='organism', column='species')
 
+    def has_nd_geolocation(self, name):
+        '''See __tab_contains'''
+        return self.__tab_contains(name, table='nd_geolocation', column='description')
+
     #def get_organism(self, genus='', species=''):
     #    self.__exe(PSQLQ.select_all
 
@@ -169,7 +175,7 @@ for table in ChadoPostgres.COMMON_TABLES:
 
 # Create convenient methods:
 #   .get_db() .get_cv() .get_..
-for table in ChadoPostgres.COMMON_TABLES + ['organism']:
+for table in ChadoPostgres.COMMON_TABLES + ['organism', 'nd_geolocation']:
     prefix = 'get_'
     newfget_name = prefix+table
     if not hasattr(ChadoPostgres, newfget_name):

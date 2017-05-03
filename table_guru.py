@@ -12,7 +12,7 @@ GERMPLASM_TYPE = 'cultivar' # constant(3 options) from MCL
 
 class TableGuru(utility.VerboseQuiet):
     '''This guy understands those spanish Oracle databases.
-    
+
     We get initialized with a table name, and are expected to fill some excel
     workbook, such that MainlabChadoLoader understands it.
 
@@ -34,13 +34,13 @@ class TableGuru(utility.VerboseQuiet):
         'VM_RESUMEN_EVAL_CALIDAD',
         'VM_RESUMEN_EVAL_MOSCA_BLANCA',
     ]
-    
+
     def __init__(self, table, oracledb, verbose=False, basedir='', update=True):
         '''We initialize (once per session, nor per __init__ call!)
         TableGuru.COLUMNS such that:
             TableGuru.COLUMNS[<tablename>][0] -> first  column name
             TableGuru.COLUMNS[<tablename>][1] -> second column name..
-            
+
         And TableGuru.TRANS with empty dict()'s.
         '''
         self.table = table
@@ -72,7 +72,7 @@ class TableGuru(utility.VerboseQuiet):
 
     def __check_column(self, table, conf, entry):
         '''Check a single entry in the currently parsed config for correcness.
-        
+
         If we cannot handle <entry> for <table> we return False, otherwise True
         is returned.
         '''
@@ -189,9 +189,56 @@ class TableGuru(utility.VerboseQuiet):
 
         return sheets
 
+    def __check_and_add_sites(self):
+        '''Filling the chado nd_geolocation table.
+
+        The sites (or geolocations) are also added to self.geolocs, so we can
+        map phenotyping data to the created locations.
+        '''
+        sheets = []
+        trg = {}
+        for k,v in self.tr.iteritems():
+            if 'nd_geolocation' in v:
+                v = v.split('.')[1]
+                if v == 'description':  # Chado column name
+                    v = 'site_name'     # but MCL calls it like this..
+                trg.update({v:k})
+
+        # TODO
+        current = self.chado.get_nd_geolocation()
+        known = [i.description for i in current]
+        if self.update:
+            unknown = [i for i in self.data if not getattr(i, trg['site_name'])\
+                       in known]
+        else:
+            unknown = self.data
+
+        names = [getattr(i, trg['site_name']) for i in unknown]
+        alts = [getattr(i, trg['altitude']) for i in unknown]
+        lats = [getattr(i, trg['latitude']) for i in unknown]
+        longs = [getattr(i, trg['longitude']) for i in unknown]
+
+        fname = os.path.join(self.basedir, 'geoloc.xlsx')
+        self.sht.create_geolocation(fname, names, alts, lats, longs)
+        sheets.append(fname)
+
+        return sheets
+
+    def __check_and_add_phenotypes(self):
+        '''Adds the phenotyping data to the accoring MCL spreadsheets.
+
+        Return a list() of created phenotype-spreadsheets. If none have to
+        be added an empty list is returned.
+        '''
+        sheets = []
+
+        # TODO writeon
+
+        return sheets
+
     def get_translation(self):
         '''Returns the translation dictionary for the current self.table.
-        
+
         Note that we save that stuff in static class variables, thus after the
         first invocation, we don't access that file again.
         We also do extensive error checking of that config file.
@@ -207,7 +254,7 @@ class TableGuru(utility.VerboseQuiet):
 
     def create_workbooks(self, test=None):
         '''Multiplexer for the single rake_{table} functions.
-        
+
         Each create necessary workbooks for the specified table, save them and
         returns all their names in an array.
         '''
@@ -229,27 +276,21 @@ class TableGuru(utility.VerboseQuiet):
         # Do the thing.
         sht_paths = []
         sht_paths += self.__check_and_add_stocks()
-        #sht_paths += self.__check_and_add_?()
-        # TODO Write on, after stock we add ... ? phenotypes?
+        sht_paths += self.__check_and_add_sites()
+        # TODO sht_paths += self.__check_and_add_contacts()
+        # \> MCL: "phenhotype.evaluater --shall-match--> contact.contact_name"
+        sht_paths += self.__check_and_add_phenotypes()
 
         return sht_paths
 
     def rake_vm_resumen_enfermedades(self):
         '''Create (and return as list of strings) spreadsheets to upload all
-        data from the Oracle table: VM_RESUMEN_ENFERMEDADES
-
-            #     : Writeon, but dont know when to create, because noone tells
-            #       me what those columns mean..
-        '''
+        data from the Oracle table: VM_RESUMEN_ENFERMEDADES'''
         pass
 
     def rake_vm_resumen_eval_avanzadas(self):
         '''Create (and return as string) spreadsheets to upload all data from
-        the Oracle table: VM_RESUMEN_EVAL_AVANZADAS
-
-            #     : Writeon, but dont know when to create, because noone tells
-            #       me what those columns mean..
-        '''
+        the Oracle table: VM_RESUMEN_EVAL_AVANZADAS'''
         pass
 
 
