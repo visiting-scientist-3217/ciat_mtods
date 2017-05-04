@@ -63,7 +63,7 @@ class CassavaOntology():
                 # we did not find a mapping, so this cvterm is unusable
                 to_remove.append(key)
             else:
-                self.mapping[key.SPANISH] = value
+                self.mapping[key.SPANISH.upper()] = value
         for term in to_remove:
             self.onto_sp.remove(term)
 

@@ -41,7 +41,7 @@ class SpreadsheetTests(unittest.TestCase):
             os.remove(file)
 
     def test_cv(self):
-        fd = os.path.join(PATH, 'cv.xlsx')
+        fd = os.path.join(PATH, 'testcv.xlsx')
         w = self.s.create_cv(fd, 'im a cv name', 'im the description')
         s = w.get_active_sheet()
         self.assertTrue(os.path.exists(fd))
@@ -49,7 +49,7 @@ class SpreadsheetTests(unittest.TestCase):
         self.assertEqual(s.cell(coordinate='B1').value, 'definition')
         self.rm(fd)
     def test_db(self):
-        fd = os.path.join(PATH, 'db.xlsx')
+        fd = os.path.join(PATH, 'testdb.xlsx')
         w = self.s.create_db(fd, 'im a db', 'dscsalkjdals')
         s = w.get_active_sheet()
         self.assertTrue(os.path.exists(fd))
@@ -57,7 +57,7 @@ class SpreadsheetTests(unittest.TestCase):
         self.assertEqual(s.cell(coordinate='D1').value, 'description')
         self.rm(fd)
     def test_cvterm(self):
-        fd = os.path.join(PATH, 'cvterm.xlsx')
+        fd = os.path.join(PATH, 'testcvterm.xlsx')
         db, cv = 'db', 'cv'
         cvt = ['somecvterm', 'anotherone', 'andathirdcvterm']
         w = self.s.create_cvterm(fd, db, cv, cvt)
@@ -67,7 +67,7 @@ class SpreadsheetTests(unittest.TestCase):
         self.assertEqual(s.cell(coordinate='C2').value, cvt[0])
         self.rm(fd)
     def test_cvterm2(self):
-        fd = os.path.join(PATH, 'cvterm2.xlsx')
+        fd = os.path.join(PATH, 'testcvterm2.xlsx')
         db, cv = 'db', 'cv'
         cvt = ['somecvterm', 'anotherone', 'andathirdcvterm']
         acs = [i+' acs' for i in cvt]
@@ -80,9 +80,22 @@ class SpreadsheetTests(unittest.TestCase):
         self.assertEqual(s.cell(coordinate='D3').value, acs[1])
         self.assertEqual(s.cell(coordinate='E3').value, dsc[1])
         self.rm(fd)
+    def test_contact(self):
+        fd = os.path.join(PATH, 'testcontact.xlsx')
+        names = ['my brain', 'your brain']
+        types = ['research facility', 'energy saving lamp']
+        opts = [{'lab':'WORLD'}, {'lab':'tiny cellar'}]
+        s = self.s.create_contact(fd, names, types, opts).get_active_sheet()
+        self.assertEqual(s.cell(coordinate='A2').value, names[0])
+        self.assertEqual(s.cell(coordinate='A3').value, names[1])
+        self.assertEqual(s.cell(coordinate='C2').value, types[0])
+        self.assertEqual(s.cell(coordinate='C3').value, types[1])
+        self.assertEqual(s.cell(coordinate='G2').value, 'WORLD')
+        self.assertEqual(s.cell(coordinate='G3').value, 'tiny cellar')
     def test_phenotype(self):
-        fd = os.path.join(PATH, 'phenotype.xlsx')
-        dn, sk, ge, sp = 'some dataset', 'CK 13 33 K', 'genus', 'species'
+        fd = os.path.join(PATH, 'testphenotype.xlsx')
+        dn, ge, sp = 'some dataset', 'genus', 'species'
+        sk = ['CK 13 33 K','CK 13 33 K']
         dcs = [
             {'#st':'stv1', '#ano1':'ano1v'},
             {'#ano2':'ano2v', '#st':'stv2'}

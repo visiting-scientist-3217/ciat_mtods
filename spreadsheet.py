@@ -36,6 +36,11 @@ class MCLSpreadsheet():
         'trait_descriptor_set', 'PI', 'crop', 'comments', 'reference',
         'permission', 'description'
     ]
+    CONTACT_HEADERS = [
+        '*contact_name', 'alias', '*type', 'first_name', 'last_name',
+        'institution', 'lab', 'address', 'email', 'phone', 'fax', 'title',
+        'country', 'source', 'last_update', 'url', 'comments', 'keywords'
+    ]
     PHENO_HEADERS = [
         '*dataset_name', '*stock_name', '*genus', '*species', '*sample_ID',
         'clone_ID', 'evaluator', 'site_name', 'rep', 'rootstock', 'plot',
@@ -232,18 +237,33 @@ class MCLSpreadsheet():
         return self.create_TYPE(filename, content, self.GEOLOCATION_HEADERS,
                                 'site')
 
+    def create_contact(self, filename, names, types, optionals=None):
+        '''Convenience wrapper around create_TYPE()
+        
+        Create one/manny contact entry(s). <optionals> must be a list() of
+        dict()s with keys element self.CONTACT_HEADERS, except 'contact_name'
+        and 'type' as those are already required in names and types.
+        '''
+        content = []
+        for n,t,opt_d  in zip(names, types, optionals):
+            d = {}
+            d['*contact_name'] = n
+            d['*type'] = t
+            d.update(opt_d)
+            content.append(d)
+        return self.create_TYPE(filename, content, self.CONTACT_HEADERS, 'contact')
+
     def create_phenotype(self, filename, dataset_name, stock, descriptors,
         other=[], genus='', species='', sample_id='', clone_id='', contact=''):
         '''Upload Phenotype Data.
         
         Arguments:
-            stock       If stock is specified, 'genus' and 'species' MIGHT be
-                        unambiguous, otherwise they MUST be specified, too.
-                        This requires direct chado connection..
-            genus       Throws NotImplementedError
-            species     Throws NotImplementedError
+            stocks      A list of stock values, which MUST already be in the
+                        database.
+            genus       Might be omitted if species is specified.
+            species     Might be omitted if genus is specified.
             descriptors An array of dict()s, where the keys are column names
-                        and MUST start with a '#', which is your responsibility
+                        and MUST start with a '#', and the values .. are values
             other       another array of dict()s like ^
                         with keys e{ self.PHENO_HEADERS[5:] }
             sample_id   If omitted, will be contructed from key and value of
@@ -275,7 +295,7 @@ class MCLSpreadsheet():
 
         content = []
         if other:
-            for descs, oths in zip(descriptors, other):
+            for descs, oths, stock in zip(descriptors, other):
                 sid = '{0}_{1}'.format(descs.keys()[0][1:], descs.values()[0])
                 c_dict = {'*dataset_name':dataset_name, '*stock_name':stock,
                     '*genus':genus, '*species':species, '*sample_ID':sid,

@@ -7,7 +7,8 @@ Environment:
                     for the connection you will be prompted for the password.
     ORACLEDB_PW     Oracle database password. Same ^ here.
 
-I think its unlikely that this code will be of much use for anyone else.
+I think its unlikely that this code will be of much use for anyone else. Though
+the Chado API is nice (for our purposes at least).
 
 Configuration:
 	trans.conf

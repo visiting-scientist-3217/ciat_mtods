@@ -5,6 +5,13 @@
     - ?
 '''
 
+def invert_dict(d):
+    '''Switch keys with values in a dict.'''
+    new = {}
+    for k,v in d.iteritems():
+        new.update({v:k})
+    return new
+
 from collections import namedtuple
 def make_namedtuple_with_query(cursor, query, name, data):
     '''Return <data> as a named tuple, called <name>.

@@ -20,8 +20,12 @@ class TableGuru(utility.VerboseQuiet):
     Oracle database, and if existent, they return the corresponding Oracle ->
     Chado translation dictionary or the columns of the Oracle table
     rspectively.
+
     The TRANS_C dict contains constanst relationships, that have to be
     populated by asking chado.
+
+    All __check_and_add_*-functions return a list() of created MCL-
+    spreadsheets. If none have to be added an empty list is returned.
     '''
 
     TRANS = {}
@@ -45,6 +49,7 @@ class TableGuru(utility.VerboseQuiet):
         '''
         self.table = table
         self.VERBOSE = verbose
+        self.QUIET = False
         self.oracle = oracledb
         if not self.oracle.cur:
             self.oracle.connect()
@@ -151,6 +156,8 @@ class TableGuru(utility.VerboseQuiet):
         '''
         # TODO use c_conf
         conf, c_conf = self.__get_config(chado_table=table)
+        if not conf:
+            return None, None, None, None
         def col_equal(ora, chad):
             for a,b in conf.iteritems():
                 if getattr(ora, a) != getattr(chad, b.split('.')[1]):
@@ -161,24 +168,84 @@ class TableGuru(utility.VerboseQuiet):
                 if col_equal(ora, c):
                     return True
             return False
-        return col_equal, col_in
+        return col_equal, col_in, conf, c_conf
 
-    def __check_and_add_stocks(self):
-        '''Return a list() of created stock-spreadsheets. If none have to be
-        added an empty list is returned.'''
-        sheets = []
+    def __get_needed_data(self, tab, mapping='chado'):
+        '''Returns data to upload as a list() of dict()'s for chado table
+        <tab>, a dict() which mapps oracle column to value.
+
+        This method uses all the information we have by creating dynamic
+        comparison functions based on: config files, chado and oracle
+        connection.
+
+        If <mapping> is set to 'oracle', then the returned dictionary returns
+        OracleDB keys instead of chado ones. This is necessary for
+        disambiguating phenotypes, as they all reference the 'phenotype.value'
+        field.
+        '''
+        if not mapping in ['chado', 'oracle']:
+            msg = '[.__get_needed_data] unknown <mapping> argument: {arg}, must'\
+                +' be in {li}'
+            msg = msg.format(arg=mapping, shouldbe=['chado', 'oracle'])
+            raise RuntimeError(msg)
+
+        # Get the config, and create according compare-functions.
+        is_equal, is_in, trg, trg_c = self.__get_compare_f(tab)
 
         if self.update:
-            # Get the config, and create according compare-functions.
-            is_equal, is_in = self.__get_compare_f('stock')
-            current_stocks = self.chado.get_stock()
-            unknown = [i for i in self.data if not is_in(i, current_stocks)]
+            if not is_equal or not is_in:
+                msg = '[.__check_and_add_{}s] no translation found => not'\
+                      +' uploading any related data'
+                self.qprint(msg.format(tab))
+                return []
+
+            func_name = 'get_'+tab
+            get_all_func = getattr(self.chado, func_name)
+            if not get_all_func or not callable(get_all_func):
+                msg = '[.__get_needed_data] Chado.{f} not found'
+                msg = msg.format(f=func_name)
+                raise NotImplementedError(msg)
+            current = get_all_func()
+
+            unknown = [i for i in self.data if not is_in(i, current)]
         else:
             unknown = self.data
-        stocks = [(i.GID, i.VARIEDAD) for i in unknown]
+
+        needed_data = []
+        for whole_entry in unknown:
+            entry = {}
+            for ora_attr,cha_attr in trg.iteritems():
+                try:
+                    # Why you ask? See *this-func*.__doc__
+                    if mapping == 'chado':
+                        entry.update(
+                            {cha_attr : getattr(whole_entry, ora_attr)}
+                        )
+                    elif mapping == 'oracle':
+                        entry.update(
+                            {ora_attr : getattr(whole_entry, ora_attr)}
+                        )
+                except AttributeError as e:
+                    # XXX I'm not sure if we should catch this, because it has
+                    # to be fix'ed in the database, but I don't have access and
+                    # don't want to crash here every time, so..
+                    msg = '[{err}] {msg}'.format(err=e.__class__, msg=e.message)
+                    self.qprint(msg)
+            needed_data.append(entry)
+
+        return needed_data
+
+    def __check_and_add_stocks(self):
+        '''Creates MCL spreadsheets to upload the genexpression information.
+
+        This functions refers to the chado 'stock' table.
+        '''
+        sheets = []
+
+        stocks = self.__get_needed_data('stock')
 
         if stocks:
-            # i rly want to: self.chado.create_stock(..)
+            stocks = [(i['stock.uniquename'], i['stock.name']) for i in stocks]
             orga = self.chado.get_organism(where="common_name = 'Cassava'")[0]
             fname = os.path.join(self.basedir, 'stocks.xlsx')
             germpl_t = GERMPLASM_TYPE
@@ -190,49 +257,71 @@ class TableGuru(utility.VerboseQuiet):
         return sheets
 
     def __check_and_add_sites(self):
-        '''Filling the chado nd_geolocation table.
+        '''Creates MCL spreadsheets to upload the geolocation information.
 
-        The sites (or geolocations) are also added to self.geolocs, so we can
-        map phenotyping data to the created locations.
+        This functions refers to the chado 'nd_geolocation' table.
         '''
         sheets = []
-        trg = {}
-        for k,v in self.tr.iteritems():
-            if 'nd_geolocation' in v:
-                v = v.split('.')[1]
-                if v == 'description':  # Chado column name
-                    v = 'site_name'     # but MCL calls it like this..
-                trg.update({v:k})
 
-        # TODO
-        current = self.chado.get_nd_geolocation()
-        known = [i.description for i in current]
-        if self.update:
-            unknown = [i for i in self.data if not getattr(i, trg['site_name'])\
-                       in known]
-        else:
-            unknown = self.data
+        sites = self.__get_needed_data('nd_geolocation')
 
-        names = [getattr(i, trg['site_name']) for i in unknown]
-        alts = [getattr(i, trg['altitude']) for i in unknown]
-        lats = [getattr(i, trg['latitude']) for i in unknown]
-        longs = [getattr(i, trg['longitude']) for i in unknown]
+        if sites:
+            # We need to split the data, for this spreadsheed.create*()
+            # FIXME Maybe we made a tiny mistake implementing ^ this function
+            # and a fix might enable us to pass the data without splitting it.
+            names = [i['nd_geolocation.description'] for i in sites]
+            alts = [i['nd_geolocation.altitude'] for i in sites]
+            lats = [i['nd_geolocation.latitude'] for i in sites]
+            longs = [i['nd_geolocation.longitude'] for i in sites]
 
-        fname = os.path.join(self.basedir, 'geoloc.xlsx')
-        self.sht.create_geolocation(fname, names, alts, lats, longs)
-        sheets.append(fname)
+            fname = os.path.join(self.basedir, 'geoloc.xlsx')
+            self.sht.create_geolocation(fname, names, alts, lats, longs)
+            sheets.append(fname)
+
+        return sheets
+
+    def __check_and_add_contacts(self):
+        '''Creates MCL spreadsheets to upload the contact information.
+
+        This functions refers to the chado 'contact' table.
+        '''
+        sheets = []
+
+        contacts = self.__get_needed_data('contact')
+        if contacts: # should not be the case right now
+            names = [i['contact.name'] for i in contacts]
+            types = [i['contact.type_id'] for i in contacts]
+            # TODO Add other contact fields, but seems not important right now
 
         return sheets
 
     def __check_and_add_phenotypes(self):
-        '''Adds the phenotyping data to the accoring MCL spreadsheets.
+        '''Creates MCL spreadsheets to upload the phenotyping data.
 
-        Return a list() of created phenotype-spreadsheets. If none have to
-        be added an empty list is returned.
+        This functions refers to the chado 'phenotype' table.
+        Ontology comes into the playground here. (self.onto, ..)
         '''
         sheets = []
 
-        # TODO writeon
+        phenotypic_data = self.__get_needed_data('phenotype', mapping='oracle')
+
+        if phenotypic_data:
+            fname = os.path.join(self.basedir, 'stocks.xlsx')
+            pmap = self.onto.mapping
+
+            tr_inv = utility.invert_dict(self.tr)
+            stocks = [getattr(i, tr_inv['stock.uniquename']) for i in self.data]
+
+            #TODO create descriptor list, remember that all must begin with '#'
+            #descs = ...
+
+            #self.sht.create_phenotype(fname, "DATASET??", stocks, descs, genus='Manihot')
+
+            # TODO don't hardcode Manihot in there, just look in the mapping
+            # for "CROP" entry, find 'Cassava' look in chado.get_organisms()
+            # and find 'Manihot'!
+
+            #sheets.append(fname)
 
         return sheets
 
@@ -277,9 +366,10 @@ class TableGuru(utility.VerboseQuiet):
         sht_paths = []
         sht_paths += self.__check_and_add_stocks()
         sht_paths += self.__check_and_add_sites()
-        # TODO sht_paths += self.__check_and_add_contacts()
-        # \> MCL: "phenhotype.evaluater --shall-match--> contact.contact_name"
+        sht_paths += self.__check_and_add_contacts()
         sht_paths += self.__check_and_add_phenotypes()
+        # \> MCL: "phenhotype.evaluater --shall-match--> contact.contact_name"
+        # But! Where are our contacts?
 
         return sht_paths
 

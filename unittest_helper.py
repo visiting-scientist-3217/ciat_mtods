@@ -61,7 +61,21 @@ class PostgreRestorer():
 
     def restore(self):
         '''Restore current chado data of our DB.'''
-        self.__exe_c(self.c_drop)
-        self.__exe_c(self.c_crea)
-        self.__exe_c(self.c_res + self.dumpfile)
+        drop_success, crea_success, res_success = False, False, False
+        for tries in range(3):
+            try:
+                if not drop_success:
+                    self.__exe_c(self.c_drop)
+                    drop_success = True
+                if not crea_success:
+                    self.__exe_c(self.c_crea)
+                    crea_success = True
+                if not res_success:
+                    self.__exe_c(self.c_res + self.dumpfile)
+                    res_success = True
+                break
+            except Exception as e:
+                print '[.restore] failed cuz {}'.format(e)
+                print '[.restore] Try fixit and press <Enter>'
+                input()
 
