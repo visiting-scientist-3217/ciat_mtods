@@ -253,7 +253,7 @@ class MCLSpreadsheet():
             content.append(d)
         return self.create_TYPE(filename, content, self.CONTACT_HEADERS, 'contact')
 
-    def create_phenotype(self, filename, dataset_name, stock, descriptors,
+    def create_phenotype(self, filename, dataset_name, stocks, descriptors,
         other=[], genus='', species='', sample_id='', clone_id='', contact=''):
         '''Upload Phenotype Data.
         
@@ -273,11 +273,13 @@ class MCLSpreadsheet():
         '''
         # Disambiguate the organism if necessary.
         if not genus:
-            orga = chado.get_organism(where="species = '{}'".format(species))
+            where_arg = "species = '{}'".format(species)
+            orga = self.chado.get_organism(where=where_arg)
             if len(orga) == 1:
                 genus = orga[0].genus
         if not species:
-            orga = chado.get_organism(where="genus = '{}'".format(genus))
+            where_arg = "genus = '{}'".format(genus)
+            orga = self.chado.get_organism(where=where_arg)
             if len(orga) == 1:
                 species = orga[0].species
         if not genus and not species:
@@ -295,7 +297,7 @@ class MCLSpreadsheet():
 
         content = []
         if other:
-            for descs, oths, stock in zip(descriptors, other):
+            for descs, oths, stock in zip(descriptors, other, stocks):
                 sid = '{0}_{1}'.format(descs.keys()[0][1:], descs.values()[0])
                 c_dict = {'*dataset_name':dataset_name, '*stock_name':stock,
                     '*genus':genus, '*species':species, '*sample_ID':sid,
@@ -304,7 +306,7 @@ class MCLSpreadsheet():
                 c_dict.update(oths)
                 content.append(c_dict)
         else:
-            for descs in descriptors:
+            for descs, stock in zip(descriptors, stocks):
                 sid = '{0}_{1}'.format(descs.keys()[0][1:], descs.values()[0])
                 c_dict = {'*dataset_name':dataset_name, '*stock_name':stock,
                     '*genus':genus, '*species':species, '*sample_ID':sid,

@@ -154,6 +154,8 @@ class BigTest(unittest.TestCase):
             cls.tg.chado.c.close()
             cls.tg.chado.con.close()
 
+            print 'Press <Enter> to restore the database.'
+            input()
             cls.pgr.restore()
 
             # Open connection again to test, if the state reverted properly.
@@ -167,7 +169,7 @@ class BigTest(unittest.TestCase):
         else:
             print 'No restore() necessary, as we did not backup()'
 
-    def test_translation_of_stock(self):
+    def test_workbook_creation(self):
         self.tg.do_upload = False
         #self.tg.VERBOSE = True
         self.sprds += self.tg.create_workbooks(test=10)

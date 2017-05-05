@@ -170,7 +170,7 @@ class TableGuru(utility.VerboseQuiet):
             return False
         return col_equal, col_in, conf, c_conf
 
-    def __get_needed_data(self, tab, mapping='chado'):
+    def __get_needed_data(self, tab, mapping='chado', raw=False):
         '''Returns data to upload as a list() of dict()'s for chado table
         <tab>, a dict() which mapps oracle column to value.
 
@@ -182,6 +182,9 @@ class TableGuru(utility.VerboseQuiet):
         OracleDB keys instead of chado ones. This is necessary for
         disambiguating phenotypes, as they all reference the 'phenotype.value'
         field.
+
+        If <raw> is True, we return a second list() of dict()'s with the whole,
+        unfiltered oracle table entrys.
         '''
         if not mapping in ['chado', 'oracle']:
             msg = '[.__get_needed_data] unknown <mapping> argument: {arg}, must'\
@@ -211,12 +214,25 @@ class TableGuru(utility.VerboseQuiet):
         else:
             unknown = self.data
 
+        # Blacklist contains oracle attributes, which we understand according
+        # to ontology or configuration, but which don't exist the OracleDB.
+        # This is most likely a mistake in the ontology or configuration, thus
+        # I have nothing to do with this.
+        blacklist = []
+
         needed_data = []
+        if raw: needed_data_raw = []
         for whole_entry in unknown:
             entry = {}
+            if raw: needed_data_raw.append(whole_entry)
+
+            skip = True
             for ora_attr,cha_attr in trg.iteritems():
+                if ora_attr in blacklist:
+                    continue
+                skip = False
                 try:
-                    # Why you ask? See *this-func*.__doc__
+                    # "Why.." you ask? See *this-func*.__doc__
                     if mapping == 'chado':
                         entry.update(
                             {cha_attr : getattr(whole_entry, ora_attr)}
@@ -225,14 +241,23 @@ class TableGuru(utility.VerboseQuiet):
                         entry.update(
                             {ora_attr : getattr(whole_entry, ora_attr)}
                         )
-                except AttributeError as e:
-                    # XXX I'm not sure if we should catch this, because it has
-                    # to be fix'ed in the database, but I don't have access and
-                    # don't want to crash here every time, so..
-                    msg = '[{err}] {msg}'.format(err=e.__class__, msg=e.message)
-                    self.qprint(msg)
+                except AttributeError:
+                    blacklist.append(ora_attr)
+            # Highly unlikely, but if it happens we better tell someone.
+            if skip and raw:
+                msg = '[.__get_needed_data] skipped a hole data-line, while'\
+                    + ' also returning raw data. This might lead to'\
+                    + ' corrupting between 1 and every line after this one!'
+                raise RuntimeError(msg)
+
             needed_data.append(entry)
 
+        if blacklist:
+            msg = '[blacklist:{tab}] Consider fixing these entries in the'\
+                +' config file or the ontology tables:\n\'\'\'\n{blk}\n\'\'\''
+            self.qprint(msg.format(tab=tab, blk=blacklist))
+
+        if raw: return needed_data, needed_data_raw
         return needed_data
 
     def __check_and_add_stocks(self):
@@ -303,27 +328,53 @@ class TableGuru(utility.VerboseQuiet):
         '''
         sheets = []
 
-        phenotypic_data = self.__get_needed_data('phenotype', mapping='oracle')
+        phenotypic_data, raw_data = \
+            self.__get_needed_data('phenotype', mapping='oracle', raw=True)
 
         if phenotypic_data:
             fname = os.path.join(self.basedir, 'stocks.xlsx')
-            pmap = self.onto.mapping
 
             tr_inv = utility.invert_dict(self.tr)
-            stocks = [getattr(i, tr_inv['stock.uniquename']) for i in self.data]
+            stocks = [getattr(i, tr_inv['stock.name']) for i in raw_data]
 
-            #TODO create descriptor list, remember that all must begin with '#'
-            #descs = ...
-
-            #self.sht.create_phenotype(fname, "DATASET??", stocks, descs, genus='Manihot')
+            descs = []
+            for phenos in phenotypic_data:
+                new = {}
+                # TODO create all cvterms for the t_name's manually, and add
+                # aditional information, like SCALE_ID, TRAIT_DESCRIPTION,
+                # TRAIT_CLASS, and more..
+                for k,v in phenos.iteritems():
+                    t_name = self.__get_trait_name(k)
+                    new.update({'#'+t_name:v})
+                descs.append(new)
 
             # TODO don't hardcode Manihot in there, just look in the mapping
             # for "CROP" entry, find 'Cassava' look in chado.get_organisms()
             # and find 'Manihot'!
+            # TODO make the dataset: 'mclpheno' a cmd-line option
+            dataset = 'some dataset name'
+            self.sht.create_phenotype(fname, dataset, stocks, descs, genus='Manihot')
 
-            #sheets.append(fname)
+            sheets.append(fname)
 
         return sheets
+
+    def __get_trait_name(self, trait):
+        '''Using self.onto.mapping, we create and return a nice trait name.
+        
+        If we get a trait name, that does not exist in the Ontology, an empty
+        string is returned.
+        '''
+        if not self.onto.mapping.has_key(trait):
+            return ''
+        vonto = self.onto.mapping[trait]
+        if len(vonto) > 1:
+            msg = '[.__get_trait_name] Note: we dont use all information we'\
+                + ' found.'
+            self.vprint(msg)
+        vonto = vonto[0]
+        name = vonto.TRAIT_NAME
+        return name
 
     def get_translation(self):
         '''Returns the translation dictionary for the current self.table.
