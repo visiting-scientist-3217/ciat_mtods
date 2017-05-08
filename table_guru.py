@@ -59,6 +59,11 @@ class TableGuru(utility.VerboseQuiet):
         self.basedir = basedir
         self.update = update
 
+        # TODO make 'em cmd-line options
+        self.dbname = 'mcl_pheno'
+        self.cvname = 'mcl_pheno'
+        self.dataset = 'mcl_pheno'
+
         if not TableGuru.COLUMNS:
             for table in TableGuru.ALL_TABLES:
                 self.c.execute(
@@ -160,8 +165,11 @@ class TableGuru(utility.VerboseQuiet):
             return None, None, None, None
         def col_equal(ora, chad):
             for a,b in conf.iteritems():
-                if getattr(ora, a) != getattr(chad, b.split('.')[1]):
-                    return False
+                try: # Currently only 'RAICES_COMERCIALES' fails here..
+                    if getattr(ora, a) != getattr(chad, b.split('.')[1]):
+                        return False
+                except AttributeError:
+                    continue
             return True
         def col_in(ora, chad_list):
             for c in chad_list:
@@ -216,8 +224,8 @@ class TableGuru(utility.VerboseQuiet):
 
         # Blacklist contains oracle attributes, which we understand according
         # to ontology or configuration, but which don't exist the OracleDB.
-        # This is most likely a mistake in the ontology or configuration, thus
-        # I have nothing to do with this.
+        # This is most likely a mistake in the ontology or configuration. Thus
+        # we pass this list to someone who cares (and is able to fixit).
         blacklist = []
 
         needed_data = []
@@ -332,28 +340,45 @@ class TableGuru(utility.VerboseQuiet):
             self.__get_needed_data('phenotype', mapping='oracle', raw=True)
 
         if phenotypic_data:
-            fname = os.path.join(self.basedir, 'stocks.xlsx')
-
             tr_inv = utility.invert_dict(self.tr)
             stocks = [getattr(i, tr_inv['stock.name']) for i in raw_data]
 
             descs = []
+            attr_blacklist = []
             for phenos in phenotypic_data:
                 new = {}
-                # TODO create all cvterms for the t_name's manually, and add
-                # aditional information, like SCALE_ID, TRAIT_DESCRIPTION,
-                # TRAIT_CLASS, and more..
                 for k,v in phenos.iteritems():
+                    if k in attr_blacklist:
+                        continue
                     t_name = self.__get_trait_name(k)
-                    new.update({'#'+t_name:v})
+                    if t_name:
+                        new.update({'#'+t_name:v})
+                    else:
+                        attr_blacklist.append(k)
                 descs.append(new)
+            if attr_blacklist:
+                msg = '[blacklist:{tab}] Consider fixing these entries in the'\
+                    +' config file or the ontology tables:\n\'\'\'\n{blk}\n\'\'\''
+                self.qprint(msg.format(tab=self.table, blk=attr_blacklist))
+
+            # Check if all phenotypes exist already as cvterm, if not, add 'em.
+            # TODO add aditional information, like SCALE_ID, TRAIT_DESCRIPTION,
+            # TRAIT_CLASS, and more..
+            all_cvt_names = [i.name for i in self.chado.get_cvterm()]
+            pheno_cvts = [i[1:] for i in descs[0].keys()] # strip the '#'
+            needed_cvts = [i for i in pheno_cvts if not i in all_cvt_names]
+            if needed_cvts:
+                fname = os.path.join(self.basedir, 'cvterms_pre_pheno.xlsx')
+                cvt_ns = [] # TODO Writeon
+                cvt_ds = []
+                self.sht.create_cvterm(fname, self.dbname, self.cvname, cvt_ns, cvt_ds)
+                sheets.append(fname)
 
             # TODO don't hardcode Manihot in there, just look in the mapping
             # for "CROP" entry, find 'Cassava' look in chado.get_organisms()
             # and find 'Manihot'!
-            # TODO make the dataset: 'mclpheno' a cmd-line option
-            dataset = 'some dataset name'
-            self.sht.create_phenotype(fname, dataset, stocks, descs, genus='Manihot')
+            fname = os.path.join(self.basedir, 'phenotyping_data.xlsx')
+            self.sht.create_phenotype(fname, self.dataset, stocks, descs, genus='Manihot')
 
             sheets.append(fname)
 

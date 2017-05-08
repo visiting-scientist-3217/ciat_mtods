@@ -132,72 +132,101 @@ class OracleTests(unittest.TestCase):
         self.assertEqual(len(onto), len(set(onto)), 'Double entries, bad!')
 
 class BigTest(unittest.TestCase):
-    '''It feels like I'm not using this unittest framework correctly.'''
+    '''Monolitic tests, building up some state. (setUpClass, and tearDownClass
+    do not apply)'''
     longMessage = True # Append my msg to default msg.
-    @classmethod
-    def setUpClass(cls):
-        cls.oracle = ConTest.oracledb
-        cls.t1 = migration.Migration.TABLES_MIGRATION_IMPLEMENTED[0]
-        cls.tg = table_guru.TableGuru(cls.t1, cls.oracle, basedir=PATH)
-        cls.sprds = []
-        cls.pgr = PGR()
-        cls.done_pg_backup = False
-        cls.stocks_created = False
-    @classmethod
-    def tearDownClass(cls):
-        for s in cls.sprds:
+
+    def step1_stateful_setup(self):
+        self.oracle = ConTest.oracledb
+        self.t1 = migration.Migration.TABLES_MIGRATION_IMPLEMENTED[0]
+        self.tg = table_guru.TableGuru(self.t1, self.oracle, basedir=PATH)
+        self.sprds = []
+        self.pgr = PGR()
+        self.stocks_created = False
+        self.done_pg_backup = False
+        self.need_rollback = False
+        self.done_restore = False
+
+    def step99_stateful_teardown(self):
+        for s in self.sprds:
             SpreadsheetTests.rm(s)
-        if cls.done_pg_backup:
+        if self.done_pg_backup:
             # Close all connections before we can restore..
             ConTest.chadodb.c.close()
             ConTest.chadodb.con.close()
-            cls.tg.chado.c.close()
-            cls.tg.chado.con.close()
+            self.tg.chado.c.close()
+            self.tg.chado.con.close()
 
             print 'Press <Enter> to restore the database.'
-            input()
-            cls.pgr.restore()
+            try:
+                input()
+            except Exception:
+                pass
+            self.cleanup()
 
             # Open connection again to test, if the state reverted properly.
             ConTest.chadodb._ChadoPostgres__connect(chado.DB, chado.USER,
                                                     chado.HOST, chado.PORT)
             stocks = ConTest.chadodb.get_stock()
-            msg = 'PG Restore failed! Strange amount of stock\'s: {is_now}, should'\
-                  +'be {shall}'
-            msg = msg.format(is_now=len(stocks), shall=cls.n_stocks)
-            if cls.n_stocks != len(stocks): print msg
+            msg = 'PG Restore failed! You should restore the DB manually.'
+            self.assertEqual(self.n_stocks, len(stocks), msg)
         else:
             print 'No restore() necessary, as we did not backup()'
 
-    def test_workbook_creation(self):
+    def step3_workbook_creation(self):
         self.tg.do_upload = False
         #self.tg.VERBOSE = True
         self.sprds += self.tg.create_workbooks(test=10)
-        BigTest.stocks_created = True
         self.assertEqual(self.sprds[0][-11:], 'stocks.xlsx', 'Cannot happen.')
 
-    def test_ustock_upload(self):
-        '''Note: this test is named ustock, because 'u' ist after 't' in the
-        alphabet and we need this test to run after
-        test_translation_of_stock().'''
-        if not self.sprds and BigTest.stocks_created:
+    def step4_drush_uploads(self):
+        if not self.sprds:
             print 'Cannot run test_stock_upload, as the previous spreadsheet'\
                  +'creation failed.'
             return
-        if not self.sprds:
-            print 'Cannot run test_stock_upload, CUZ UNITTEST WRONG ORDER'
-            return
         self.pgr.dump()
-        BigTest.done_pg_backup = True
+        self.done_pg_backup = True
         stocks = ConTest.chadodb.get_stock()
-        BigTest.n_stocks = len(stocks)
+        self.n_stocks = len(stocks)
         self.migra = migration.Migration(verbose=True)
-        print '[+] calling upload(migra.upload({}))!'.format(self.sprds[0])
-        self.migra.upload(self.sprds[0])
+        for s in self.sprds:
+            print '[+] calling upload(migra.upload({}))!'.format(s)
+            self.migra.upload(s)
+            self.need_rollback = True
 
+    def cleanup(self):
+        if not self.done_pg_backup and self.need_rollback:
+            print '[-] Need manual db rollback.. '
+        if self.done_pg_backup and self.need_rollback and not\
+                self.done_restore:
+            self.pgr.restore()
+            self.done_restore = True
+        if self.done_restore:
+            SpreadsheetTests.rm(self.pgr.dumpfile)
+    def _steps(self):
+        for name in sorted(dir(self)):
+            if name.startswith("step"):
+                yield name, getattr(self, name)
+    def test_steps(self):
+        for name, step in self._steps():
+            step()
+            #try:
+            #    step()
+            #except Exception as e:
+            #    self.cleanup()
+            #    self.fail("{} failed ({}: {})".format(name, type(e), e))
 
 def run():
-    unittest.main()
+    ts = unittest.TestSuite()
+    tl = unittest.TestLoader()
+    ts.addTest(tl.loadTestsFromTestCase(ConTest))
+    ts.addTest(tl.loadTestsFromTestCase(SpreadsheetTests))
+    ts.addTest(tl.loadTestsFromTestCase(PostgreTests))
+    ts.addTest(tl.loadTestsFromTestCase(OracleTests))
+    ts.addTest(tl.loadTestsFromTestCase(BigTest))
+
+    runner = unittest.TextTestRunner()
+    runner.run(ts)
 
 if __name__ == '__main__':
     run()

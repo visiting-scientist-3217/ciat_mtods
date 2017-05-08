@@ -6,7 +6,9 @@ We need to know this for translating the columns to their chado equivalent.
 
 from collections import namedtuple
 from utility import OracleSQLQueries as OSQLQ
+import utility
 
+# TODO remove this, and use utility.make_namedtuple_with_query
 def get_tabledata_as_tuple(cursor, table):
     '''Create a list of namedtuple's for <table> with <column_names> as
     members.
@@ -94,7 +96,8 @@ class CassavaOntology():
         chado entitys.'''
         d = dict()
         for k in self.onto_sp:
-            d.update({k.SPANISH.upper() : 'phenotype.value'})
+            normalized_name = utility.normalize(k.SPANISH.upper())
+            d.update({normalized_name : 'phenotype.value'})
         return d
 
 # So we need to join the ontology_spanish.VARIABLE_ID_BMS on

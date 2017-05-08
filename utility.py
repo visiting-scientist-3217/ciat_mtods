@@ -13,6 +13,7 @@ def invert_dict(d):
     return new
 
 from collections import namedtuple
+from re import sub
 def make_namedtuple_with_query(cursor, query, name, data):
     '''Return <data> as a named tuple, called <name>.
     
@@ -26,10 +27,18 @@ def make_namedtuple_with_query(cursor, query, name, data):
      - Data must be iterable
     '''
     cursor.execute(query)
-    headers = [i[1] for i in cursor.fetchall()]
+    headers = [normalize(i[1]) for i in cursor.fetchall()]
     NTuple = namedtuple(name, headers)
     result = [NTuple(*r) for r in data]
     return result
+
+def normalize(s):
+    '''Some string substitutions, to make it a valid Attribute.
+
+    (Not complete)
+    '''
+    ss = sub(r'\s+', '_', s)
+    return ss
 
 class OracleSQLQueries():
     '''Namespace for format()-able Oracle SQL Queries'''

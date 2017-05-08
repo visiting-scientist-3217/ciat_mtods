@@ -149,10 +149,10 @@ class MCLSpreadsheet():
             accession = cvterm
 
         if len(cvterm) != len(accession):
-            raise RuntimeError('[.create_cvterm] argument length inequal!')
+            raise RuntimeError('[.create_cvterm] argument length unequal!')
         if definition:
             if len(cvterm) != len(accession) or len(cvterm) != len(definition):
-                raise RuntimeError('[.create_cvterm] argument length inequal!')
+                raise RuntimeError('[.create_cvterm] argument length unequal!')
 
         if not definition:
             it = zip(cvterm, accession)
@@ -190,7 +190,9 @@ class MCLSpreadsheet():
         '''
         if len(name[0]) == 2:
             # given a list() of list()'s, the first element
-            content = [[q, germplasm_type, genus, species, n] for q,n in name]
+            # XXX we discard the uniquename because its just some weird number
+            # in our Oracle DB
+            content = [[g, germplasm_type, genus, species, g] for n,g in name]
         else:
             content = [[g, germplasm_type, genus, species, g] for g in name]
         return self.create_TYPE(filename, content, self.STOCK_HEADERS, 'stock')
@@ -290,10 +292,12 @@ class MCLSpreadsheet():
             for d in ds.keys():
                 if '#' != d[0]:
                     msg = 'phenotype descriptor({0}->{1}) must begin with "#"'
-                    msg = msg.format(d, ds[d])
                     class StupidUserError(RuntimeError):
                         pass
-                    raise StupidUserError(msg)
+                    raise StupidUserError(msg.format(d, ds[d]))
+                if len(d) < 3:
+                    msg = 'phenotype descriptor({0}->{1}) cannot be empty'
+                    raise RuntimeError(msg.format(d, ds[d]))
 
         content = []
         if other:
