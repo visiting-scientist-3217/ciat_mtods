@@ -32,7 +32,7 @@ if not os.path.exists(PATH):
 class SpreadsheetTests(unittest.TestCase):
 
     # Controls all spreadsheet files, that might get created while testing.
-    KEEP_FILES = True
+    KEEP_FILES = False
     s = spreadsheet.MCLSpreadsheet(ConTest.chadodb)
 
     @staticmethod
@@ -202,7 +202,7 @@ class BigTest(unittest.TestCase):
             self.pgr.restore()
             self.done_restore = True
         if self.done_restore:
-            SpreadsheetTests.rm(self.pgr.dumpfile)
+            os.remove(self.pgr.dumpfile)
     def _steps(self):
         for name in sorted(dir(self)):
             if name.startswith("step"):

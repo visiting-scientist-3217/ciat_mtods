@@ -28,8 +28,9 @@ class Drush():
 
     BASE_DIR = os.getcwd() # see mtods
 
-    def __init__(self, usr=DEFAULT_USR):
+    def __init__(self, usr=DEFAULT_USR, nodump=True):
         '''Also checks if we're good to go.'''
+        self.nodump = nodump
         self.usr = usr
         self.MCL_UPLOAD = self.MCL_UPLOAD.format(usr=self.usr, file='{file}')
         self.MCL_LIST = self.MCL_LIST.format(usr=self.usr)
@@ -55,13 +56,18 @@ class Drush():
         more priviledges, so we try again with sudo. If we still fail, construct a
         nice error message, and dump the output.
         '''
-        status, out = self.execute('pml', nodump=True, quiet=True)
+        status, out = self.execute('pml', quiet=True)
         if status == 0:
             return
         else:
             self.NEED_SUDO = True
             self.__set_drush_cmd()
+
+            tmp = self.nodump
+            self.nodump = True
             status, out = self.execute('pml')
+            self.nodump = tmp
+
             if status != 0:
                 msg = '[-] drush exited with {0}'.format(status)
                 raise RuntimeError(msg)
@@ -80,7 +86,7 @@ class Drush():
         if not q:
             print "[-] dump written to '{}'".format(fd.name)
 
-    def execute(self, cmd, nodump=False, quiet=False):
+    def execute(self, cmd, quiet=False):
         '''Creates a drush cmd line, executes it and returns a
         tuple(status, output).
         '''
@@ -94,7 +100,7 @@ class Drush():
 
         if not out:
             return status, None
-        if not nodump and '[error]' in out:
+        if not self.nodump and '[error]' in out:
             dfname = 'drush_{}.log'.format(cmd.split(os.path.sep)[0])
             self.__dump_output(dfname, out, quiet)
 

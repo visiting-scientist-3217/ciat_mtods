@@ -262,11 +262,74 @@ class TableGuru(utility.VerboseQuiet):
 
         if blacklist:
             msg = '[blacklist:{tab}] Consider fixing these entries in the'\
-                +' config file or the ontology tables:\n\'\'\'\n{blk}\n\'\'\''
+                + ' config file or the ontology'\
+                + ' tables:\n\'\'\'\n{blk}\n\'\'\'\n'
             self.qprint(msg.format(tab=tab, blk=blacklist))
 
         if raw: return needed_data, needed_data_raw
         return needed_data
+
+    def __check_and_add_cvterms(self, maybe_known, f_ext=''):
+        '''Check if <maybe_known> cvterm-names already exist in Chado.
+
+        If we find unknown cvterms, we create one or more MCL spreadsheets and
+        return their paths in a list().
+
+        We try to find information about the requested cvterms:
+            -1- We check ontology. If we find information, we might create more
+                than one cvterm per given cvterm-name, to supply with the chado
+                relationship schema.
+            -2- If not found(^), we create raw cvterms without description.
+
+        Note that we do a case insensitive comparison while trying to find
+        Ontology for a term in <maybe_known>.
+        '''
+        all_cvt_names = [i.name for i in self.chado.get_cvterm()]
+        needed_cvts = [i for i in maybe_known if not i in all_cvt_names]
+        sheets = []
+
+        if not needed_cvts:
+            return []
+        needed_onto = []
+        for cvt in needed_cvts:
+            it = self.onto.mapping.iteritems()
+            cur = [i[1][0] for i in it if i[1][0].TRAIT_NAME.lower() ==\
+                    cvt.lower()]
+            if len(cur) == 0:
+                continue
+            if len(cur) != 1: # Well crap.
+                msg = '[.__check_and_add_cvterms] Did not find excactly'\
+                    + ' one cvterm, for a single needed name: {c} -> {d}'
+                self.qprint(msg.format(c=cvt, d=cur))
+                cur = [cur[0]]
+            needed_onto += cur
+
+        # Check if we have Ontology for all needed cvterms.
+        if len(needed_cvts) == len(needed_onto):
+            # TODO add aditional information, like METHOD_NAME,
+            # METHOD_CLASS, SCALE_ID, TRAIT_DESCRIPTION, TRAIT_CLASS, ++
+            # But therefor we need to access Chado manually.
+            cvt_ns = [i.TRAIT_NAME for i in needed_onto]
+            cvt_ds = ['{cls}: {dsc}'.format(dsc=i.TRAIT_DESCRIPTION,\
+                        cls=i.TRAIT_CLASS) for i in needed_onto]
+        else:
+            cvt_ns = needed_cvts
+            cvt_ds = []
+
+        bname = 'cvterms_{ext}.xlsx'.format(ext=f_ext+'{}')
+        fname = os.path.join(self.basedir, bname.format(''))
+        if os.path.exists(fname):
+            for i in range(10):
+                fname = os.path.join(self.basedir, bname.format(i))
+                if not os.path.exists(fname):
+                    break
+            else:
+                raise RuntimeError('Too manny cvterm uploads. (>10)')
+
+        self.sht.create_cvterm(fname, self.dbname, self.cvname, cvt_ns,
+                                definition=cvt_ds)
+        sheets.append(fname)
+        return sheets
 
     def __check_and_add_stocks(self):
         '''Creates MCL spreadsheets to upload the genexpression information.
@@ -299,6 +362,10 @@ class TableGuru(utility.VerboseQuiet):
         sites = self.__get_needed_data('nd_geolocation')
 
         if sites:
+            mandatory_cvts = ['type', 'country', 'state', 'region', 'address',
+                              'site_code']
+            sheets += self.__check_and_add_cvterms(mandatory_cvts,
+                                                   f_ext='pre_sites')
             # We need to split the data, for this spreadsheed.create*()
             # FIXME Maybe we made a tiny mistake implementing ^ this function
             # and a fix might enable us to pass the data without splitting it.
@@ -321,10 +388,11 @@ class TableGuru(utility.VerboseQuiet):
         sheets = []
 
         contacts = self.__get_needed_data('contact')
-        if contacts: # should not be the case right now
+        if contacts:
             names = [i['contact.name'] for i in contacts]
             types = [i['contact.type_id'] for i in contacts]
-            # TODO Add other contact fields, but seems not important right now
+            # TODO Add other contact fields, but seems not important right now,
+            # because there is no contact data in the Oracle DB.
 
         return sheets
 
@@ -358,27 +426,25 @@ class TableGuru(utility.VerboseQuiet):
                 descs.append(new)
             if attr_blacklist:
                 msg = '[blacklist:{tab}] Consider fixing these entries in the'\
-                    +' config file or the ontology tables:\n\'\'\'\n{blk}\n\'\'\''
+                    + ' config file or the ontology'\
+                    + ' tables:\n\'\'\'\n{blk}\n\'\'\'\n'
                 self.qprint(msg.format(tab=self.table, blk=attr_blacklist))
 
             # Check if all phenotypes exist already as cvterm, if not, add 'em.
-            # TODO add aditional information, like SCALE_ID, TRAIT_DESCRIPTION,
-            # TRAIT_CLASS, and more..
-            all_cvt_names = [i.name for i in self.chado.get_cvterm()]
             pheno_cvts = [i[1:] for i in descs[0].keys()] # strip the '#'
-            needed_cvts = [i for i in pheno_cvts if not i in all_cvt_names]
-            if needed_cvts:
-                fname = os.path.join(self.basedir, 'cvterms_pre_pheno.xlsx')
-                cvt_ns = [] # TODO Writeon
-                cvt_ds = []
-                self.sht.create_cvterm(fname, self.dbname, self.cvname, cvt_ns, cvt_ds)
-                sheets.append(fname)
+            sheets += self.__check_and_add_cvterms(pheno_cvts,
+                                                   f_ext='pre_pheno')
 
-            # TODO don't hardcode Manihot in there, just look in the mapping
-            # for "CROP" entry, find 'Cassava' look in chado.get_organisms()
-            # and find 'Manihot'!
+
+            # Looking in the first ontology mapping and then Chado, to find the
+            # genus of Cassava. ('Manihot')
+            crp = next(self.onto.mapping.iteritems())[1][0].CROP
+            where = "common_name = '{}'".format(crp)
+            genus = self.chado.get_organism(where=where)[0].genus
+
             fname = os.path.join(self.basedir, 'phenotyping_data.xlsx')
-            self.sht.create_phenotype(fname, self.dataset, stocks, descs, genus='Manihot')
+            self.sht.create_phenotype(fname, self.dataset, stocks, descs,
+                                      genus=genus)
 
             sheets.append(fname)
 
