@@ -39,7 +39,8 @@ class Migration(utility.VerboseQuiet):
 
     BASE_DIR = ''
 
-    def __init__(self, upload=True, verbose=False, quiet=False, only_update=False):
+    def __init__(self, upload=True, verbose=False, quiet=False,
+                 only_update=False, **tgargs):
         '''We set some configuration, connect to the database, and create a
         local cursor object.
 
@@ -101,7 +102,7 @@ class Migration(utility.VerboseQuiet):
         '''
         tg = table_guru.TableGuru(table, self.db, self.VERBOSE,
                                   basedir=self.basedir,
-                                  update=self.only_update)
+                                  update=self.only_update, **tgargs)
         names = tg.create_workbooks(update=self.only_update)
         if self.xlsx_files:
             self.vprint('[.create_xlsx_from] clearing self.xlsx_files')

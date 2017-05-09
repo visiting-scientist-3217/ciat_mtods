@@ -39,7 +39,9 @@ class TableGuru(utility.VerboseQuiet):
         'VM_RESUMEN_EVAL_MOSCA_BLANCA',
     ]
 
-    def __init__(self, table, oracledb, verbose=False, basedir='', update=True):
+    def __init__(self, table, oracledb, verbose=False, basedir='', update=True,
+                 chado_db='mcl_pheno', chado_cv='mcl_pheno',
+                 chado_dataset='mcl_pheno'): # XXX maybe erase those defaults
         '''We initialize (once per session, nor per __init__ call!)
         TableGuru.COLUMNS such that:
             TableGuru.COLUMNS[<tablename>][0] -> first  column name
@@ -59,10 +61,16 @@ class TableGuru(utility.VerboseQuiet):
         self.basedir = basedir
         self.update = update
 
-        # TODO make 'em cmd-line options
-        self.dbname = 'mcl_pheno'
-        self.cvname = 'mcl_pheno'
-        self.dataset = 'mcl_pheno'
+        self.dbname = chado_db
+        self.cvname = chado_cv
+        self.dataset = chado_dataset
+        msg = 'TableGuru: Mandatory {0} not found: {1}'
+        if not chado_cv in [i.name for i in self.chado.get_cv()]:
+            raise RuntimeError(msg.format('cv', chado_cv))
+        if not chado_db in [i.name for i in self.chado.get_db()]:
+            raise RuntimeError(msg.format('db', chado_db))
+        if not chado_dataset in [i.name for i in self.chado.get_project()]:
+            raise RuntimeError(msg.format('project/dataset', chado_dataset))
 
         if not TableGuru.COLUMNS:
             for table in TableGuru.ALL_TABLES:
@@ -165,7 +173,7 @@ class TableGuru(utility.VerboseQuiet):
             return None, None, None, None
         def col_equal(ora, chad):
             for a,b in conf.iteritems():
-                try: # Currently only 'RAICES_COMERCIALES' fails here..
+                try: # XXX print what fails here! ('RAICES_COMERCIALES')
                     if getattr(ora, a) != getattr(chad, b.split('.')[1]):
                         return False
                 except AttributeError:
@@ -202,6 +210,12 @@ class TableGuru(utility.VerboseQuiet):
 
         # Get the config, and create according compare-functions.
         is_equal, is_in, trg, trg_c = self.__get_compare_f(tab)
+
+        if not trg or not trg_c:
+            msg = '[.__check_and_add_{}s] no CONFIG found => not'\
+                    +' uploading any related data'
+            self.qprint(msg.format(tab))
+            return []
 
         if self.update:
             if not is_equal or not is_in:
@@ -391,8 +405,7 @@ class TableGuru(utility.VerboseQuiet):
         if contacts:
             names = [i['contact.name'] for i in contacts]
             types = [i['contact.type_id'] for i in contacts]
-            # TODO Add other contact fields, but seems not important right now,
-            # because there is no contact data in the Oracle DB.
+            # TODO contact (not important, cuz no data)
 
         return sheets
 

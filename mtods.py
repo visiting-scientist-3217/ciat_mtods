@@ -65,10 +65,12 @@ def main():
     migra = migration.Migration(verbose=o.verbose, quiet=o.quiet)
 
     if o.basedir or not o.single_table:
-        migra.full(basedir=o.basedir, upload=o.do_upload, only_update=o.do_update)
+        migra.full(basedir=o.basedir, upload=o.do_upload,
+                   only_update=o.do_update, chado_db=o.ch_db, chado_cv=o.ch_cv,
+                   chado_dataset=o.ch_pj)
     else:
-        migra.single(o.single_table)
-
+        migra.single(o.single_table, chado_db=o.ch_db, chado_cv=o.ch_cv,
+                     chado_dataset=o.ch_pj)
     return 0
 
 def optparse_init():
@@ -107,6 +109,19 @@ def optparse_init():
     pgo.add_option('-d', '--pg_db', action='store', type='string',
         dest='pg_db', help='postgres db, defaults to drupal7', metavar='<db>')
 
+    pch = optparse.OptionGroup(p, 'Chado/Drupal7 Config Options', 'MCL needs a'\
+        + ' specific setup of project, projectprop and cv to be able to upload'\
+        + ' phenotyping data..')
+    pch.add_option('--ch-db', action='store', type='string', dest='ch_db',
+        help='that db entry (default: mcl_pheno)', metavar='<db>',
+        default='mcl_pheno')
+    pch.add_option('--ch-cv', action='store', type='string', dest='ch_cv',
+        help='that cv entry (default: mcl_pheno)', metavar='<cv>',
+        default='mcl_pheno')
+    pch.add_option('--ch-pj', action='store', type='string', dest='ch_pj',
+        help='that pj entry (default: mcl_pheno)', metavar='<pj>',
+        default='mcl_pheno')
+
     test = optparse.OptionGroup(p, 'Debug Options', '')
     test.add_option('-n', '--no-upload', action='store_false', dest='do_upload',
         help='do NOT upload the spreadsheed via drush (default: False)',
@@ -115,7 +130,7 @@ def optparse_init():
     # Full migration options
     full = optparse.OptionGroup(p, 'Full Migration (default)', '')
     full.add_option('-b', '--basedir', action='store', type='string',
-        dest='basedir', help='default to {}'.format(BASE_DIR),
+        dest='basedir', help='defaults to {}'.format(BASE_DIR),
         metavar='<path>', default=BASE_DIR)
 
     # Single table options
@@ -126,6 +141,7 @@ def optparse_init():
         metavar='<table>', default='')
 
     p.add_option_group(pgo)
+    p.add_option_group(pch)
     p.add_option_group(full)
     p.add_option_group(single)
     p.add_option_group(test)

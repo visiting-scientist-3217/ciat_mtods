@@ -176,7 +176,7 @@ class BigTest(unittest.TestCase):
     def step3_workbook_creation(self):
         self.tg.do_upload = False
         #self.tg.VERBOSE = True
-        self.sprds += self.tg.create_workbooks(test=10)
+        self.sprds += self.tg.create_workbooks(test=100)
         self.assertEqual(self.sprds[0][-11:], 'stocks.xlsx', 'Cannot happen.')
 
     def step4_drush_uploads(self):

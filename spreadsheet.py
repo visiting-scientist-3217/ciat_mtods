@@ -122,7 +122,8 @@ class MCLSpreadsheet():
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
         wb.save(filename)
-        return wb
+        del wb # XXX need to free memory.. 
+        return filename
 
     def create_db(self, filename, name, description=''):
         '''Convenience wrapper around create_TYPE()'''
