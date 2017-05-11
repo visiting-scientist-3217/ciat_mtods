@@ -76,7 +76,7 @@ class Drush():
         '''Create a dumpfile named <name>, located at <self.BASE_DIR>. If the file
         exists, we prefix the current date and time.
         '''
-        tmp = '{path}/{opt}{f}'
+        tmp = os.path.join('{path}', '{opt}{f}')
         fd = tmp.format(path=self.BASE_DIR, opt='', f=name)
         if os.path.exists(fd):
             now = time.strftime('%m_%d_%H-%M-%S_', time.localtime())

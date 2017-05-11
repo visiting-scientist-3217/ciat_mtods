@@ -134,7 +134,7 @@ class TableGuru(utility.VerboseQuiet):
                     msg = msg.format(col, conf.get(self.table, col))
                     raise RuntimeError(msg)
 
-    def __get_config(self, chado_table=None, oracle_table=None):
+    def __get_config(self, chado_table=None, oracle_column=None):
         '''Returns only the (TRANS, TRANS_C) config that match the given
         arguments.'''
         if not self.TRANS or not self.TRANS_C:
@@ -149,15 +149,15 @@ class TableGuru(utility.VerboseQuiet):
             [ctr.update({k:v}) for k,v in ct_it if eval(cond)]
             return tr, ctr
 
-        if chado_table and oracle_table:
+        if chado_table and oracle_column:
             tr, ctr = fill_with_cond("v.split('.')[0] == c and k == o",
-                                     chado_table, oracle_table)
+                                     chado_table, oracle_column)
         if chado_table:
             tr, ctr = fill_with_cond("v.split('.')[0] == c", chado_table)
-        elif oracle_table:
-            tr, ctr = fill_with_cond("k == o", oracle_table)
+        elif oracle_column:
+            tr, ctr = fill_with_cond("k == o", oracle_column)
         else:
-            raise RuntimeError('Must supply either chado_table or oracle_table')
+            raise RuntimeError('Must supply either chado_table or oracle_column')
 
         return tr, ctr
 
@@ -211,7 +211,7 @@ class TableGuru(utility.VerboseQuiet):
         # Get the config, and create according compare-functions.
         is_equal, is_in, trg, trg_c = self.__get_compare_f(tab)
 
-        if not trg or not trg_c:
+        if not trg and not trg_c:
             msg = '[.__check_and_add_{}s] no CONFIG found => not'\
                     +' uploading any related data'
             self.qprint(msg.format(tab))
@@ -381,8 +381,6 @@ class TableGuru(utility.VerboseQuiet):
             sheets += self.__check_and_add_cvterms(mandatory_cvts,
                                                    f_ext='pre_sites')
             # We need to split the data, for this spreadsheed.create*()
-            # FIXME Maybe we made a tiny mistake implementing ^ this function
-            # and a fix might enable us to pass the data without splitting it.
             names = [i['nd_geolocation.description'] for i in sites]
             alts = [i['nd_geolocation.altitude'] for i in sites]
             lats = [i['nd_geolocation.latitude'] for i in sites]
@@ -419,48 +417,66 @@ class TableGuru(utility.VerboseQuiet):
 
         phenotypic_data, raw_data = \
             self.__get_needed_data('phenotype', mapping='oracle', raw=True)
+        if not phenotypic_data:
+            return sheets
 
-        if phenotypic_data:
-            tr_inv = utility.invert_dict(self.tr)
-            stocks = [getattr(i, tr_inv['stock.name']) for i in raw_data]
+        # Get metadata, we need to link.
+        tr_inv = utility.invert_dict(self.tr)
+        stocks = [getattr(i, tr_inv['stock.name']) for i in raw_data]
 
-            descs = []
-            attr_blacklist = []
-            for phenos in phenotypic_data:
+        others = []
+        no_geo = False
+        try: 
+            test = getattr(raw_data[0], tr_inv['nd_geolocation.description'])
+        except AttributeError as e:
+            msg = '[-] no nd_geolocation data in {tab}'
+            self.qprint(msg.format(tab=self.table))
+            no_geo = True
+        except KeyError as e:
+            msg = '[-] no nd_geolocation config found'
+            self.qprint(msg)
+            no_geo = True
+        if not no_geo:
+            for i in raw_data:
                 new = {}
-                for k,v in phenos.iteritems():
-                    if k in attr_blacklist:
-                        continue
-                    t_name = self.__get_trait_name(k)
-                    if t_name:
-                        new.update({'#'+t_name:v})
-                    else:
-                        attr_blacklist.append(k)
-                descs.append(new)
-            if attr_blacklist:
-                msg = '[blacklist:{tab}] Consider fixing these entries in the'\
-                    + ' config file or the ontology'\
-                    + ' tables:\n\'\'\'\n{blk}\n\'\'\'\n'
-                self.qprint(msg.format(tab=self.table, blk=attr_blacklist))
+                location = getattr(i, tr_inv['nd_geolocation.description'])
+                new.update({'site_name' : location})
+                others.append(new)
 
-            # Check if all phenotypes exist already as cvterm, if not, add 'em.
-            pheno_cvts = [i[1:] for i in descs[0].keys()] # strip the '#'
-            sheets += self.__check_and_add_cvterms(pheno_cvts,
-                                                   f_ext='pre_pheno')
+        # Get the real phenotyping data into position.
+        descs = []
+        attr_blacklist = []
+        for phenos in phenotypic_data:
+            new = {}
+            for k,v in phenos.iteritems():
+                if k in attr_blacklist:
+                    continue
+                t_name = self.__get_trait_name(k)
+                if t_name:
+                    new.update({'#'+t_name:v})
+                else:
+                    attr_blacklist.append(k)
+            descs.append(new)
+        if attr_blacklist:
+            msg = '[blacklist:{tab}] Consider fixing these entries in the'\
+                + ' config file or the ontology'\
+                + ' tables:\n\'\'\'\n{blk}\n\'\'\'\n'
+            self.qprint(msg.format(tab=self.table, blk=attr_blacklist))
 
+        # Check if all phenotypes exist already as cvterm, if not, add 'em.
+        pheno_cvts = [i[1:] for i in descs[0].keys()] # strip the '#'
+        sheets += self.__check_and_add_cvterms(pheno_cvts, f_ext='pre_pheno')
 
-            # Looking in the first ontology mapping and then Chado, to find the
-            # genus of Cassava. ('Manihot')
-            crp = next(self.onto.mapping.iteritems())[1][0].CROP
-            where = "common_name = '{}'".format(crp)
-            genus = self.chado.get_organism(where=where)[0].genus
+        # Looking in the first ontology mapping and then Chado, to find the
+        # genus of Cassava. ('Manihot')
+        crp = next(self.onto.mapping.iteritems())[1][0].CROP
+        where = "common_name = '{}'".format(crp)
+        genus = self.chado.get_organism(where=where)[0].genus
 
-            fname = os.path.join(self.basedir, 'phenotyping_data.xlsx')
-            self.sht.create_phenotype(fname, self.dataset, stocks, descs,
-                                      genus=genus)
-
-            sheets.append(fname)
-
+        fname = os.path.join(self.basedir, 'phenotyping_data.xlsx')
+        self.sht.create_phenotype(fname, self.dataset, stocks, descs,
+                                  other=others, genus=genus)
+        sheets.append(fname)
         return sheets
 
     def __get_trait_name(self, trait):

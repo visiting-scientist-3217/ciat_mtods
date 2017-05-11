@@ -92,6 +92,7 @@ class SpreadsheetTests(unittest.TestCase):
         self.assertEqual(s.cell(coordinate='C3').value, types[1])
         self.assertEqual(s.cell(coordinate='G2').value, 'WORLD')
         self.assertEqual(s.cell(coordinate='G3').value, 'tiny cellar')
+        self.rm(fd)
     def test_phenotype(self):
         fd = os.path.join(PATH, 'testphenotype.xlsx')
         dn, ge, sp = 'some dataset', 'genus', 'species'
@@ -148,8 +149,6 @@ class BigTest(unittest.TestCase):
         self.done_restore = False
 
     def step99_stateful_teardown(self):
-        for s in self.sprds:
-            SpreadsheetTests.rm(s)
         if self.done_pg_backup:
             # Close all connections before we can restore..
             ConTest.chadodb.c.close()
@@ -172,11 +171,13 @@ class BigTest(unittest.TestCase):
             self.assertEqual(self.n_stocks, len(stocks), msg)
         else:
             print 'No restore() necessary, as we did not backup()'
+        for s in self.sprds:
+            SpreadsheetTests.rm(s)
 
     def step3_workbook_creation(self):
         self.tg.do_upload = False
         #self.tg.VERBOSE = True
-        self.sprds += self.tg.create_workbooks(test=100)
+        self.sprds += self.tg.create_workbooks(test=150000)
         self.assertEqual(self.sprds[0][-11:], 'stocks.xlsx', 'Cannot happen.')
 
     def step4_drush_uploads(self):

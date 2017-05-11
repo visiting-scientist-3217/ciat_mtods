@@ -50,7 +50,6 @@ class MCLSpreadsheet():
 
     def __init__(self, chado_connection):
         '''Expecting an initialized database cursor to the chado schema.'''
-        self.created_xlsxs = []
         self.chado = chado_connection
 
     def __create_xlsx(self, headers, content, title=''):
@@ -79,9 +78,26 @@ class MCLSpreadsheet():
             if type(row) == dict:
                 row = self.__how_i_understand_dict(ws1, row)
             ws1.append(row)
-
-        self.created_xlsxs.append(wb)
         return wb
+
+    def __get_row_0_by_cell_calls(self, s):
+        '''We need to bypass the <rows> member, because it is actually a VERY
+        heavy function call created by the @property decorator.
+        
+        Note that we are assuming no empty columns in row-0! This can be savely
+        assumed for MCL templates, but is obviously not correct in general.
+        '''
+        row = []
+        for i in range(70):
+            cell = s.cell(row=0, column=i)
+            if not cell.value:
+                break
+            row.append(cell)
+            if i == 69:
+                class IDontThinkSoError(RuntimeError):
+                    pass
+                raise IDontThinkSoError("[-] 69 headers? Cannot happen.")
+        return row
 
     def __how_i_understand_dict(self, s, d):
         '''A change to the openpyxl.worksheet.append function.
@@ -89,7 +105,11 @@ class MCLSpreadsheet():
         Makes dictionary keys refer to row-0 content, not only coordinate. If a
         key-matching row-0 column does not exist, we create it.
         '''
-        headers = [h.value for h in s.rows[0]]
+        #headers = [h.value for h in s.rows[0]]
+        #NEW BEGIN
+        row0 = self.__get_row_0_by_cell_calls(s)
+        headers = [h.value for h in row0]
+        #NEW END
         new_d = {}
 
         for key,value in d.iteritems():
@@ -97,15 +117,20 @@ class MCLSpreadsheet():
                 key = headers.index(key)
             else:
                 s.cell(row=0, column=len(headers)).value = key
-                headers = [h.value for h in s.rows[0]] # needed for len()
+                #headers = [h.value for h in s.rows[0]] # update headers
+                #NEW BEGIN
+                row0 = self.__get_row_0_by_cell_calls(s)
+                headers = [h.value for h in row0]
+                #NEW END
                 key = headers.index(key)
             new_d[key] = value
 
         return new_d
 
     def create_TYPE(self, filename, content, TYPE, sheetname=''):
-        '''Create, save, and return a <TYPE> spreadsheet with content.
+        '''Create and save a <TYPE> spreadsheet with content.
 
+        Returns its filename.
         If sheetname is set, the sheetname is changed to sheetname.
         The TYPE is an array used as header. We supply some MCL defaults:
             self.DB_HEADERS
@@ -113,8 +138,8 @@ class MCLSpreadsheet():
             self. ..
 
         Note: The type(content[0]) may be a list() or a dict(), in later case
-              values are assigned to the columns indicated by the keys
-              (numbers/keywords).
+              values are assigned to the columns indicated by the keys in
+              rows[0].
         '''
         wb = self.__create_xlsx(TYPE, content)
         if sheetname:
@@ -122,8 +147,8 @@ class MCLSpreadsheet():
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
         wb.save(filename)
-        del wb # XXX need to free memory.. 
-        return filename
+        #del wb # need to free memory.. 
+        return wb
 
     def create_db(self, filename, name, description=''):
         '''Convenience wrapper around create_TYPE()'''
