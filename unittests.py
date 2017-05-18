@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import unittest
+import traceback
 from unittest_helper import PostgreRestorer as PGR
 import spreadsheet
 import chado
@@ -32,7 +33,7 @@ if not os.path.exists(PATH):
 class SpreadsheetTests(unittest.TestCase):
 
     # Controls all spreadsheet files, that might get created while testing.
-    KEEP_FILES = False
+    KEEP_FILES = True
     s = spreadsheet.MCLSpreadsheet(ConTest.chadodb)
 
     @staticmethod
@@ -103,7 +104,17 @@ class SpreadsheetTests(unittest.TestCase):
         ]
         s = self.s.create_phenotype(fd, dn, sk, dcs, genus=ge,
                                     species=sp).get_active_sheet()
-        self.assertEqual(s.cell(coordinate='E2').value, 'st_stv1')
+        #self.assertEqual(s.cell(coordinate='E2').value, 'st_stv1')
+        for i in ['V{}', 'W{}', 'X{}']:
+            i,j,k = i.format(1), i.format(2), i.format(3)
+            if s.cell(coordinate=i).value == '#ano1':
+                self.assertEqual(s.cell(coordinate=j).value, 'ano1v')
+            if s.cell(coordinate=i).value == '#st':
+                self.assertEqual(s.cell(coordinate=j).value, 'stv1')
+                self.assertEqual(s.cell(coordinate=k).value, 'stv2')
+            if s.cell(coordinate=i).value == '#ano2':
+                self.assertEqual(s.cell(coordinate=k).value, 'ano2v')
+
         headers = [h.value for h in s.rows[0]]
         for d in dcs:
             for key in d:
@@ -132,12 +143,16 @@ class OracleTests(unittest.TestCase):
         self.assertEqual(len(onto_sp), 24, 'Size changed, interesting.')
         self.assertEqual(len(onto), len(set(onto)), 'Double entries, bad!')
 
+# To enable this, set enableThisMonoliticTestWithLongDuration to True.
 class BigTest(unittest.TestCase):
     '''Monolitic tests, building up some state. (setUpClass, and tearDownClass
     do not apply)'''
     longMessage = True # Append my msg to default msg.
+    enableThisMonoliticTestWithLongDuration = True
+    NTEST = 100 # Number of lines imported, this should directly correlate to
+                # the added rows of phenotyping data in chado.
 
-    def step1_stateful_setup(self):
+    def step10_stateful_setup(self):
         self.oracle = ConTest.oracledb
         self.t1 = migration.Migration.TABLES_MIGRATION_IMPLEMENTED[0]
         self.tg = table_guru.TableGuru(self.t1, self.oracle, basedir=PATH)
@@ -148,39 +163,14 @@ class BigTest(unittest.TestCase):
         self.need_rollback = False
         self.done_restore = False
 
-    def step99_stateful_teardown(self):
-        if self.done_pg_backup:
-            # Close all connections before we can restore..
-            ConTest.chadodb.c.close()
-            ConTest.chadodb.con.close()
-            self.tg.chado.c.close()
-            self.tg.chado.con.close()
-
-            print 'Press <Enter> to restore the database.'
-            try:
-                input()
-            except Exception:
-                pass
-            self.cleanup()
-
-            # Open connection again to test, if the state reverted properly.
-            ConTest.chadodb._ChadoPostgres__connect(chado.DB, chado.USER,
-                                                    chado.HOST, chado.PORT)
-            stocks = ConTest.chadodb.get_stock()
-            msg = 'PG Restore failed! You should restore the DB manually.'
-            self.assertEqual(self.n_stocks, len(stocks), msg)
-        else:
-            print 'No restore() necessary, as we did not backup()'
-        for s in self.sprds:
-            SpreadsheetTests.rm(s)
-
-    def step3_workbook_creation(self):
-        self.tg.do_upload = False
-        #self.tg.VERBOSE = True
-        self.sprds += self.tg.create_workbooks(test=150000)
+    def step11_workbook_creation(self):
+        self.sprds += self.tg.create_workbooks(test=self.NTEST)
         self.assertEqual(self.sprds[0][-11:], 'stocks.xlsx', 'Cannot happen.')
 
-    def step4_drush_uploads(self):
+        # Get some more info into class variables to check later.
+        self.n_phenos0 = self.__get_pheno_count()
+
+    def step12_drush_uploads(self):
         if not self.sprds:
             print 'Cannot run test_stock_upload, as the previous spreadsheet'\
                  +'creation failed.'
@@ -195,27 +185,76 @@ class BigTest(unittest.TestCase):
             self.migra.upload(s)
             self.need_rollback = True
 
-    def cleanup(self):
+    def step20_inside_tests(self):
+        if not self.need_rollback:
+            print '[-] cannot do inside tests, as no data was uploaded'
+            return
+        msg = 'should have at least the amount of phenotypes, that we uploaded'\
+            + 'as rows, realistically it should be a multiple of that number'
+        minimum = self.n_phenos0 + self.NTEST
+        self.assertGreaterEqual(self.__get_pheno_count(), minimum, msg)
+
+    def step90_stateful_teardown(self):
+        if not self.done_pg_backup:
+            print 'No restore() necessary, as we did not backup()'
+            return
+
+        self.cleanup()
+
+    def step91_after_tests(self):
+        # Open connection again to test, if the state reverted properly.
+        ConTest.chadodb._ChadoPostgres__connect(chado.DB, chado.USER,
+                                                chado.HOST, chado.PORT)
+        stocks = ConTest.chadodb.get_stock()
+        msg = 'PG Restore failed! You should restore the DB manually.'
+        self.assertEqual(self.n_stocks, len(stocks), msg)
+        self.assertEqual(self.n_phenos0, self.__get_pheno_count(), msg)
+
+    def cleanup(self, wait_for_inp=True):
+        if wait_for_inp:
+            print 'Press <Enter> to restore the database.'
+            try:
+                input()
+            except Exception:
+                pass
+
+        for s in self.sprds:
+            SpreadsheetTests.rm(s)
+
         if not self.done_pg_backup and self.need_rollback:
             print '[-] Need manual db rollback.. '
         if self.done_pg_backup and self.need_rollback and not\
                 self.done_restore:
+            # Close all connections before we can restore..
+            ConTest.chadodb.c.close()
+            ConTest.chadodb.con.close()
+            self.tg.chado.c.close()
+            self.tg.chado.con.close()
+            # now restore..
             self.pgr.restore()
             self.done_restore = True
         if self.done_restore:
             os.remove(self.pgr.dumpfile)
+
     def _steps(self):
         for name in sorted(dir(self)):
             if name.startswith("step"):
                 yield name, getattr(self, name)
+
     def test_steps(self):
-        for name, step in self._steps():
-            step()
-            #try:
-            #    step()
-            #except Exception as e:
-            #    self.cleanup()
-            #    self.fail("{} failed ({}: {})".format(name, type(e), e))
+        if BigTest.enableThisMonoliticTestWithLongDuration:
+            for name, step in self._steps():
+                try:
+                    step()
+                except Exception as e:
+                    traceback.print_exc(e)
+                    self.cleanup()
+                    break
+
+    def __get_pheno_count(self):
+        ConTest.chadodb.c.execute('select count(*) from phenotype')
+        return ConTest.chadodb.c.fetchall()[0][0]
+
 
 def run():
     ts = unittest.TestSuite()

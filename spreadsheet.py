@@ -5,6 +5,7 @@ speadsheet creation.'''
 import openpyxl
 import os
 import re
+from random import randint
 
 class MCLSpreadsheet():
     '''Writes MCL compatible spreadsheets for chado import.'''
@@ -147,7 +148,8 @@ class MCLSpreadsheet():
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
         wb.save(filename)
-        #del wb # need to free memory.. 
+        # need to free the workbook memory ASAP, but for unittesting purposes
+        # we return it
         return wb
 
     def create_db(self, filename, name, description=''):
@@ -212,12 +214,13 @@ class MCLSpreadsheet():
 
         Given a <name> argument as a list of list()'s not a list of strings, we
         interpret the first[0] entry as the uniquename and the second as the
-        name.
+        name. (We discard the uniquename if name is given, and use name
+        instead)
         '''
         if len(name[0]) == 2:
-            # given a list() of list()'s, the first element
-            # XXX we discard the uniquename because its just some weird number
-            # in our Oracle DB
+            # Note: we discard the uniquename because its just some weird
+            # number in our Oracle DB, and some drupal7 modules sometimes need
+            # the one, and sometimes the other to be the identifier.
             content = [[g, germplasm_type, genus, species, g] for n,g in name]
         else:
             content = [[g, germplasm_type, genus, species, g] for g in name]
@@ -243,6 +246,10 @@ class MCLSpreadsheet():
         '''
         if not fmt in ['NSEW', '+-']:
             raise RuntimeError('[.create_geolocation] fmt wrong')
+
+        # The [0]'s entry value must be unique (demanded by MCL not by Chado)
+        it = zip(names, alts, lats, longs)
+        names = ["{0}_{1}_{2}_{3}".format(*args) for args in it]
 
         # Strip leading whitespace, leading zeroes, and substitute N E S W..
         if fmt == 'NSEW':
@@ -325,10 +332,14 @@ class MCLSpreadsheet():
                     msg = 'phenotype descriptor({0}->{1}) cannot be empty'
                     raise RuntimeError(msg.format(d, ds[d]))
 
+        # This sid .. is not clearly defined by MCL ... 
         content = []
+        i = 0 # ensure uniqueness
         if other:
             for descs, oths, stock in zip(descriptors, other, stocks):
-                sid = '{0}_{1}'.format(descs.keys()[0][1:], descs.values()[0])
+                sid = '{0}_{1}_{2}'
+                sid = sid.format(descs.keys()[0][1:], descs.values()[0], i)
+                i += 1
                 c_dict = {'*dataset_name':dataset_name, '*stock_name':stock,
                     '*genus':genus, '*species':species, '*sample_ID':sid,
                     'clone_ID':clone_id, 'evaluator':contact}
@@ -337,7 +348,9 @@ class MCLSpreadsheet():
                 content.append(c_dict)
         else:
             for descs, stock in zip(descriptors, stocks):
-                sid = '{0}_{1}'.format(descs.keys()[0][1:], descs.values()[0])
+                sid = '{0}_{1}_{2}'
+                sid = sid.format(descs.keys()[0][1:], descs.values()[0], i)
+                i += 1
                 c_dict = {'*dataset_name':dataset_name, '*stock_name':stock,
                     '*genus':genus, '*species':species, '*sample_ID':sid,
                     'clone_ID':clone_id, 'evaluator':contact}

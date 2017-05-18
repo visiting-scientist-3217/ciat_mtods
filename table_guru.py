@@ -41,7 +41,7 @@ class TableGuru(utility.VerboseQuiet):
 
     def __init__(self, table, oracledb, verbose=False, basedir='', update=True,
                  chado_db='mcl_pheno', chado_cv='mcl_pheno',
-                 chado_dataset='mcl_pheno'): # XXX maybe erase those defaults
+                 chado_dataset='mcl_pheno'):
         '''We initialize (once per session, nor per __init__ call!)
         TableGuru.COLUMNS such that:
             TableGuru.COLUMNS[<tablename>][0] -> first  column name
@@ -99,12 +99,12 @@ class TableGuru(utility.VerboseQuiet):
             return True
 
         if entry in TableGuru.COLUMNS[table]:
-            TableGuru.TRANS[self.table][entry] = conf.get(self.table, entry)
+            TableGuru.TRANS[table][entry] = conf.get(table, entry)
             return True
         if TableGuru.TRANS_C.has_key(entry):
             return True
 
-        value = conf.get(self.table, entry)
+        value = conf.get(table, entry)
         if value[:2] == '/*' and value[-2:] == '*/':
             value = value.split('/*')[1].split('*/')[0]
             TableGuru.TRANS_C[entry] = value.lstrip().rstrip()
@@ -403,10 +403,10 @@ class TableGuru(utility.VerboseQuiet):
         if contacts:
             names = [i['contact.name'] for i in contacts]
             types = [i['contact.type_id'] for i in contacts]
-            # TODO contact (not important, cuz no data)
 
         return sheets
 
+    # TODO use 'pick_date' and 'plant_date'
     def __check_and_add_phenotypes(self):
         '''Creates MCL spreadsheets to upload the phenotyping data.
 
@@ -422,26 +422,29 @@ class TableGuru(utility.VerboseQuiet):
 
         # Get metadata, we need to link.
         tr_inv = utility.invert_dict(self.tr)
+
+        # stocks needs to be passed as aditional argument
         stocks = [getattr(i, tr_inv['stock.name']) for i in raw_data]
 
         others = []
-        no_geo = False
-        try: 
-            test = getattr(raw_data[0], tr_inv['nd_geolocation.description'])
-        except AttributeError as e:
-            msg = '[-] no nd_geolocation data in {tab}'
-            self.qprint(msg.format(tab=self.table))
-            no_geo = True
-        except KeyError as e:
-            msg = '[-] no nd_geolocation config found'
-            self.qprint(msg)
-            no_geo = True
-        if not no_geo:
-            for i in raw_data:
-                new = {}
-                location = getattr(i, tr_inv['nd_geolocation.description'])
-                new.update({'site_name' : location})
-                others.append(new)
+        for i in raw_data:
+            new = {}
+            for k,v in tr_inv.iteritems():
+                if k == 'nd_geolocation.description':
+                    # If this block throws an error one day remember:
+                    #   a description is useless without the coordinates
+                    name = getattr(i, tr_inv['nd_geolocation.description'])
+                    alt = getattr(i, tr_inv['nd_geolocation.altitude'])
+                    lat = getattr(i, tr_inv['nd_geolocation.latitude'])
+                    lon = getattr(i, tr_inv['nd_geolocation.longitude'])
+                    location = "{0}_{1}_{2}_{3}".format(name, alt, lat, lon)
+                    new.update({'site_name' : location})
+                if 'date' in k:
+                    if 'plant' in k:
+                        new.update({'plant_date' : str(getattr(i, v))})
+                    elif 'pick' in k:
+                        new.update({'pick_date' : str(getattr(i, v))})
+            others.append(new)
 
         # Get the real phenotyping data into position.
         descs = []
