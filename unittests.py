@@ -145,23 +145,34 @@ class OracleTests(unittest.TestCase):
 
 # To enable this, set enableThisMonoliticTestWithLongDuration to True.
 class BigTest(unittest.TestCase):
-    '''Monolitic tests, building up some state. (setUpClass, and tearDownClass
-    do not apply)'''
-    longMessage = True # Append my msg to default msg.
+    '''
+    Monolitic tests, building up some state. (setUpClass, and tearDownClass do
+    not apply)
+    '''
+    # Append my msg to default msg.
+    longMessage = True 
+
+    # Create spreadsheets for a real migration.
     enableThisMonoliticTestWithLongDuration = True
-    NTEST = 100 # Number of lines imported, this should directly correlate to
-                # the added rows of phenotyping data in chado.
+    # If we upload via drush, we don't know exactly what happens, thus we need
+    # a full db-rollback, which is even more timeconsuming.
+    enableDrushUpload = True
+
+    # Number of lines imported, this should directly correlate to the added
+    # rows of phenotyping data in chado. If 'None' all data will be used.
+    NTEST = None
+                
 
     def step10_stateful_setup(self):
+        self.stocks_created = False
+        self.done_pg_backup = False
+        self.need_rollback = False
+        self.done_restore = False
         self.oracle = ConTest.oracledb
         self.t1 = migration.Migration.TABLES_MIGRATION_IMPLEMENTED[0]
         self.tg = table_guru.TableGuru(self.t1, self.oracle, basedir=PATH)
         self.sprds = []
         self.pgr = PGR()
-        self.stocks_created = False
-        self.done_pg_backup = False
-        self.need_rollback = False
-        self.done_restore = False
 
     def step11_workbook_creation(self):
         self.sprds += self.tg.create_workbooks(test=self.NTEST)
@@ -171,19 +182,23 @@ class BigTest(unittest.TestCase):
         self.n_phenos0 = self.__get_pheno_count()
 
     def step12_drush_uploads(self):
+        msg_stop = 'stopping step-execution via Exception'
         if not self.sprds:
-            print 'Cannot run test_stock_upload, as the previous spreadsheet'\
-                 +'creation failed.'
-            return
+            msg = 'Cannot run test_stock_upload, as the previous spreadsheet'\
+                 +' creation failed, {}.'.format(msg_stop)
+            raise StopIteration(msg)
+        if not BigTest.enableDrushUpload:
+            msg = 'Drush upload disabled, {}.'.format(msg_stop)
+            raise StopIteration(msg)
         self.pgr.dump()
         self.done_pg_backup = True
         stocks = ConTest.chadodb.get_stock()
         self.n_stocks = len(stocks)
         self.migra = migration.Migration(verbose=True)
         for s in self.sprds:
-            print '[+] calling upload(migra.upload({}))!'.format(s)
-            self.migra.upload(s)
+            print '[+] migra.upload("{}")!'.format(s)
             self.need_rollback = True
+            self.migra.upload(s)
 
     def step20_inside_tests(self):
         if not self.need_rollback:
@@ -211,8 +226,12 @@ class BigTest(unittest.TestCase):
         self.assertEqual(self.n_phenos0, self.__get_pheno_count(), msg)
 
     def cleanup(self, wait_for_inp=True):
+        '''
+        Wait for <Return>, then check if we need and can do a db rollback, if
+        so: do it.
+        '''
         if wait_for_inp:
-            print 'Press <Enter> to restore the database.'
+            print 'Press <Return> to restore the database.'
             try:
                 input()
             except Exception:

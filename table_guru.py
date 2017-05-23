@@ -5,6 +5,7 @@ import spreadsheet
 import cassava_ontology
 import ConfigParser
 import os
+import datetime
 
 # Path to the translation cfg file.
 CONF_PATH = 'trans.conf'
@@ -87,6 +88,20 @@ class TableGuru(utility.VerboseQuiet):
                         res=str(self.COLUMNS[table])[:30]+"... ]"
                     )
                 )
+
+    def __tostr(self, d):
+        '''Formatting helper
+
+        For now only datetime.datetime implemented, for other objects we return
+        str(<object>).
+        If we get None we return the empty string! Not 'None'! (== str(None))
+        '''
+        if d == None:
+            return ''
+        if type(d) is datetime.datetime:
+            return d.strftime('%Y-%m-%d')
+        else:
+            return str(d)
 
     def __check_column(self, table, conf, entry):
         '''Check a single entry in the currently parsed config for correcness.
@@ -440,10 +455,11 @@ class TableGuru(utility.VerboseQuiet):
                     location = "{0}_{1}_{2}_{3}".format(name, alt, lat, lon)
                     new.update({'site_name' : location})
                 if 'date' in k:
+                    d = self.__tostr(getattr(i, v))
                     if 'plant' in k:
-                        new.update({'plant_date' : str(getattr(i, v))})
+                        new.update({'plant_date' : d})
                     elif 'pick' in k:
-                        new.update({'pick_date' : str(getattr(i, v))})
+                        new.update({'pick_date' : d})
             others.append(new)
 
         # Get the real phenotyping data into position.
@@ -547,14 +563,13 @@ class TableGuru(utility.VerboseQuiet):
 
         return sht_paths
 
+    # Reserved for individual setup if ever necessary. Empty for now, because
+    # at this point we only have usefull information about a single table.
     def rake_vm_resumen_enfermedades(self):
-        '''Create (and return as list of strings) spreadsheets to upload all
-        data from the Oracle table: VM_RESUMEN_ENFERMEDADES'''
+        '''pass'''
         pass
-
     def rake_vm_resumen_eval_avanzadas(self):
-        '''Create (and return as string) spreadsheets to upload all data from
-        the Oracle table: VM_RESUMEN_EVAL_AVANZADAS'''
+        '''pass'''
         pass
 
 
