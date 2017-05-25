@@ -4,6 +4,9 @@
     - commonly used functions
     - ?
 '''
+import threading
+from collections import namedtuple
+from re import sub
 
 def invert_dict(d):
     '''Switch keys with values in a dict.'''
@@ -12,8 +15,6 @@ def invert_dict(d):
         new.update({v:k})
     return new
 
-from collections import namedtuple
-from re import sub
 def make_namedtuple_with_query(cursor, query, name, data):
     '''Return <data> as a named tuple, called <name>.
     
@@ -63,6 +64,9 @@ class PostgreSQLQueries():
     select_all_from_where_eq = '''\
         SELECT * FROM {table} WHERE {col} = '{name}'\
     '''
+    select_count = '''\
+        SELECT count(*) FROM {table}\
+    '''
     insert_into_table = '''\
         INSERT INTO {table} {columns} VALUES {values}\
     '''
@@ -76,14 +80,25 @@ class PostgreSQLQueries():
     '''
 
 
-class VerboseQuiet():
+class VerboseQuiet(object):
     '''To be inherited from.'''
+    def __init__(self):
+        self.printlock = threading.Lock()
     def vprint(self, s):
         '''Only print stuff, if we are in verbose mode.'''
+        if hasattr(self, 'printlock'):
+            self.printlock.acquire()
         if self.VERBOSE:
             print s
+        if hasattr(self, 'printlock'):
+            self.printlock.release()
+
     def qprint(self, s):
         '''Only print stuff, if we are NOT in quiet mode.'''
+        if hasattr(self, 'printlock'):
+            self.printlock.acquire()
         if not self.QUIET:
             print s
+        if hasattr(self, 'printlock'):
+            self.printlock.release()
 

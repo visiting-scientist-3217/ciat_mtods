@@ -1,7 +1,6 @@
 import utility
 from utility import OracleSQLQueries as OSQL
 import chado
-import spreadsheet
 import cassava_ontology
 import ConfigParser
 import os
@@ -25,8 +24,8 @@ class TableGuru(utility.VerboseQuiet):
     The TRANS_C dict contains constanst relationships, that have to be
     populated by asking chado.
 
-    All __check_and_add_*-functions return a list() of created MCL-
-    spreadsheets. If none have to be added an empty list is returned.
+    All __check_and_add_*-functions return a list() of created upload-tasks.
+    If none have to be added an empty list is returned.
     '''
 
     TRANS = {}
@@ -50,52 +49,53 @@ class TableGuru(utility.VerboseQuiet):
 
         And TableGuru.TRANS with empty dict()'s.
         '''
-        self.table = table
+        super(self.__class__, self).__init__()
         self.VERBOSE = verbose
         self.QUIET = False
+        self.basedir = basedir
+        self.update = update
+
         self.oracle = oracledb
         if not self.oracle.cur:
             self.oracle.connect()
         self.c = oracledb.cur
-        self.onto = cassava_ontology.CassavaOntology(self.c)
         self.chado = chado.ChadoPostgres()
-        self.basedir = basedir
-        self.update = update
+        self.onto = cassava_ontology.CassavaOntology(self.c)
 
+        self.table = table
         self.dbname = chado_db
         self.cvname = chado_cv
         self.dataset = chado_dataset
+
+        self.__error_checks()
+        self.__setup_columns()
+
+
+    def __error_checks(self):
         msg = 'TableGuru: Mandatory {0} not found: {1}'
-        if not chado_cv in [i.name for i in self.chado.get_cv()]:
+        if not self.cvname in [i.name for i in self.chado.get_cv()]:
             raise RuntimeError(msg.format('cv', chado_cv))
-        if not chado_db in [i.name for i in self.chado.get_db()]:
+        if not self.dbname in [i.name for i in self.chado.get_db()]:
             raise RuntimeError(msg.format('db', chado_db))
-        if not chado_dataset in [i.name for i in self.chado.get_project()]:
+        if not self.dataset in [i.name for i in self.chado.get_project()]:
             raise RuntimeError(msg.format('project/dataset', chado_dataset))
 
+    def __setup_columns(self):
         if not TableGuru.COLUMNS:
             for table in TableGuru.ALL_TABLES:
                 self.c.execute(
                     OSQL.get_column_metadata_from.format(table=table)
                 )
-                # column_name is the 2nd entry of each tuple, see OSQL
                 TableGuru.COLUMNS[table] = [
                     line[1] for line in self.c.fetchall()
                 ]
-                self.vprint(
-                    '[+] TableGuru.COLUMNS[{table}] = {res}'.format(
-                        table=table,
-                        res=str(self.COLUMNS[table])[:30]+"... ]"
-                    )
-                )
+                msg = '[+] TableGuru.COLUMNS[{table}] = {res}'
+                msg = msg.format(table=table,
+                                 res=str(self.COLUMNS[table])[:30]+"... ]")
+                self.vprint(msg)
 
     def __tostr(self, d):
-        '''Formatting helper
-
-        For now only datetime.datetime implemented, for other objects we return
-        str(<object>).
-        If we get None we return the empty string! Not 'None'! (== str(None))
-        '''
+        '''Formatting helper'''
         if d == None:
             return ''
         if type(d) is datetime.datetime:
@@ -110,7 +110,7 @@ class TableGuru(utility.VerboseQuiet):
         is returned.
         '''
         if not TableGuru.COLUMNS.has_key(table):
-            # This is one of the ontology tables.. We can ignore this for now.
+            # This is one of the ontology tables, no need for translation.
             return True
 
         if entry in TableGuru.COLUMNS[table]:
@@ -218,8 +218,7 @@ class TableGuru(utility.VerboseQuiet):
         unfiltered oracle table entrys.
         '''
         if not mapping in ['chado', 'oracle']:
-            msg = '[.__get_needed_data] unknown <mapping> argument: {arg}, must'\
-                +' be in {li}'
+            msg = 'unknown <mapping> argument: {arg}, must be in {li}'
             msg = msg.format(arg=mapping, shouldbe=['chado', 'oracle'])
             raise RuntimeError(msg)
 
@@ -227,24 +226,22 @@ class TableGuru(utility.VerboseQuiet):
         is_equal, is_in, trg, trg_c = self.__get_compare_f(tab)
 
         if not trg and not trg_c:
-            msg = '[.__check_and_add_{}s] no CONFIG found => not'\
-                    +' uploading any related data'
+            msg = '[{}] no CONFIG found => not uploading any related data'
             self.qprint(msg.format(tab))
             return []
 
         if self.update:
             if not is_equal or not is_in:
-                msg = '[.__check_and_add_{}s] no translation found => not'\
-                      +' uploading any related data'
+                msg = '[{}] no translation found => not uploading any related'\
+                    + ' data'
                 self.qprint(msg.format(tab))
                 return []
 
             func_name = 'get_'+tab
             get_all_func = getattr(self.chado, func_name)
             if not get_all_func or not callable(get_all_func):
-                msg = '[.__get_needed_data] Chado.{f} not found'
-                msg = msg.format(f=func_name)
-                raise NotImplementedError(msg)
+                msg = 'Chado.{} not found'
+                raise NotImplementedError(msg.format(func_name))
             current = get_all_func()
 
             unknown = [i for i in self.data if not is_in(i, current)]
@@ -253,8 +250,9 @@ class TableGuru(utility.VerboseQuiet):
 
         # Blacklist contains oracle attributes, which we understand according
         # to ontology or configuration, but which don't exist the OracleDB.
-        # This is most likely a mistake in the ontology or configuration. Thus
-        # we pass this list to someone who cares (and is able to fixit).
+        # This is most likely a mistake in the ontology or configuration.
+        # So we better pass this list to someone who cares (and is able to fix
+        # it).
         blacklist = []
 
         needed_data = []
@@ -269,7 +267,7 @@ class TableGuru(utility.VerboseQuiet):
                     continue
                 skip = False
                 try:
-                    # "Why.." you ask? See *this-func*.__doc__
+                    # See __doc__
                     if mapping == 'chado':
                         entry.update(
                             {cha_attr : getattr(whole_entry, ora_attr)}
@@ -282,9 +280,9 @@ class TableGuru(utility.VerboseQuiet):
                     blacklist.append(ora_attr)
             # Highly unlikely, but if it happens we better tell someone.
             if skip and raw:
-                msg = '[.__get_needed_data] skipped a hole data-line, while'\
-                    + ' also returning raw data. This might lead to'\
-                    + ' corrupting between 1 and every line after this one!'
+                msg = ' skipped a hole data-line, while also returning raw'\
+                    + ' data. This might lead to corrupting between 1 and'\
+                    + ' every line after this one!'
                 raise RuntimeError(msg)
 
             needed_data.append(entry)
@@ -301,12 +299,9 @@ class TableGuru(utility.VerboseQuiet):
     def __check_and_add_cvterms(self, maybe_known, f_ext=''):
         '''Check if <maybe_known> cvterm-names already exist in Chado.
 
-        If we find unknown cvterms, we create one or more MCL spreadsheets and
-        return their paths in a list().
-
         We try to find information about the requested cvterms:
             -1- We check ontology. If we find information, we might create more
-                than one cvterm per given cvterm-name, to supply with the chado
+                than one cvterm per given cvterm-name, to comply to the chado
                 relationship schema.
             -2- If not found(^), we create raw cvterms without description.
 
@@ -361,7 +356,7 @@ class TableGuru(utility.VerboseQuiet):
         return sheets
 
     def __check_and_add_stocks(self):
-        '''Creates MCL spreadsheets to upload the genexpression information.
+        '''Tasks to upload the genexpression information.
 
         This functions refers to the chado 'stock' table.
         '''
@@ -531,48 +526,31 @@ class TableGuru(utility.VerboseQuiet):
 
         return TableGuru.TRANS[self.table]
 
-    def create_workbooks(self, test=None):
+    def create_upload_tasks(self, test=None):
         '''Multiplexer for the single rake_{table} functions.
 
         Each create necessary workbooks for the specified table, save them and
         returns all their names in an array.
         '''
         self.tr = self.get_translation()
-        self.sht = spreadsheet.MCLSpreadsheet(self.chado)
         sql = OSQL.get_all_from.format(table=self.table)
         self.data = self.oracle.get_rows(sql, table=self.table,
                                          fetchamount=test)
+        t = {}
+        t.update({'stocks' : self.__check_and_add_stocks()})
+        t.update({'sites' : self.__check_and_add_sites()})
+        t.update({'contacts' : self.__check_and_add_contacts()})
+        t.update({'phenos' : self.__check_and_add_phenotypes()})
 
-        # Find an call custom function for each spreadsheet.
-        to_call = 'rake_'+self.table.lower()
-        f = getattr(self, to_call)
-        if not f or not callable(f):
-            msg = '[.create_workbooks] table: {0}, f: {1}'
-            msg = msg.format(self.table, to_call)
-            raise RuntimeError(msg)
-        f()
+        # we are done with it
+        del self.data
 
-        # Do the thing.
-        sht_paths = []
-        sht_paths += self.__check_and_add_stocks()
-        sht_paths += self.__check_and_add_sites()
-        sht_paths += self.__check_and_add_contacts()
-        sht_paths += self.__check_and_add_phenotypes()
-        # \> MCL: "phenhotype.evaluater --shall-match--> contact.contact_name"
-        # But! Where are our contacts?
-
-        return sht_paths
-
-    # Reserved for individual setup if ever necessary. Empty for now, because
-    # at this point we only have usefull information about a single table.
-    def rake_vm_resumen_enfermedades(self):
-        '''pass'''
-        pass
-    def rake_vm_resumen_eval_avanzadas(self):
-        '''pass'''
-        pass
-
-
+        # the tasks variable is explained in migration.py -> __parallel_upload
+        tasks = (
+            [ t['stocks'], t['sites'], t['contacts'], ],
+            t['phenos'], 
+        )
+        return tasks
 
 # Just fill in some empty dict()'s.
 for table in TableGuru.ALL_TABLES:

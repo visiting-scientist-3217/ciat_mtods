@@ -1,6 +1,6 @@
-#!/usr/bin/python
-'''Chado Helper Module'''
-
+'''
+Chado Helper Module
+'''
 import psycopg2 as psql
 import getpass
 import types            # used to copy has_.. functions
@@ -51,8 +51,9 @@ class ChadoPostgres():
         except psql.OperationalError as e:
             prompt = '{n}/3 psql connection to {db} as {usr} @'\
                     +' {host}:{port}\nPassword: '
-            i = 1 # 3 tries
-            while i < 4 and not self.con:
+            for i in range(1, 4):
+                if self.con:
+                    break
                 try: 
                     pw = getpass.getpass(prompt=prompt.format(n=i, db=db,
                         usr=usr, host=host, port=port))
@@ -60,18 +61,17 @@ class ChadoPostgres():
                         host=host, port=port)
                 except psql.OperationalError as e:
                     pass
-                finally:
-                    i += 1
         if not self.con:
-            raise e #RuntimeError('Could not connect to the PGSQL')
+            raise e
 
         self.c = self.con.cursor()
 
     def __exe(self, query):
-        '''self.c.execute + self.lastq = fetchall()'''
+        '''execute + fetchall, remembers last query and result'''
         self.c.execute(query)
-        self.lastq = self.c.fetchall()
-        return self.lastq
+        self.lastq = query
+        self.last_res = self.c.fetchall()
+        return self.last_res
 
     def __tab_contains(self, name, table='', column='name'):
         '''Return True if Chado's '{table}' table contains an entry with
@@ -80,9 +80,7 @@ class ChadoPostgres():
             raise RuntimeError('need \'table\' argument')
         sql = PSQLQ.select_all_from_where_eq
         sql = sql.format(table=table, name=name, col=column)
-        self.__exe(sql)
-
-        if self.lastq:
+        if self.__exe(sql):
             return True
         else:
             return False
@@ -123,9 +121,11 @@ class ChadoPostgres():
         '''See __tab_contains'''
         return self.__tab_contains(name, table='nd_geolocation', column='description')
 
-    #def get_organism(self, genus='', species=''):
-    #    self.__exe(PSQLQ.select_all
-
+    def count_from(self, table):
+        '''Return row count from the given table.'''
+        r = self.__exe(PSQLQ.select_count.format(table=table))[0][0]
+        self.last_res = r
+        return r
    
     def create_organism(self, genus, species, abbreviation='', common_name='',
         comment=''):
@@ -152,6 +152,10 @@ class ChadoPostgres():
         self.c.execute(sql)
         if not self.con.autocommit:
             self.con.commit()
+
+    def create_phenotypes(self, data):
+        '''...'''
+        pass
 
 # META-BEGIN
 # Metaprogramming helper-function.
