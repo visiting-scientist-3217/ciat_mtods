@@ -1,5 +1,6 @@
 import utility
 from utility import OracleSQLQueries as OSQL
+from utility import Task
 import chado
 import cassava_ontology
 import ConfigParser
@@ -310,7 +311,7 @@ class TableGuru(utility.VerboseQuiet):
         '''
         all_cvt_names = [i.name for i in self.chado.get_cvterm()]
         needed_cvts = [i for i in maybe_known if not i in all_cvt_names]
-        sheets = []
+        tasks = []
 
         if not needed_cvts:
             return []
@@ -352,15 +353,15 @@ class TableGuru(utility.VerboseQuiet):
 
         self.sht.create_cvterm(fname, self.dbname, self.cvname, cvt_ns,
                                 definition=cvt_ds)
-        sheets.append(fname)
-        return sheets
+        tasks.append(fname)
+        return tasks
 
     def __check_and_add_stocks(self):
         '''Tasks to upload the genexpression information.
 
         This functions refers to the chado 'stock' table.
         '''
-        sheets = []
+        tasks = []
 
         stocks = self.__get_needed_data('stock')
 
@@ -371,24 +372,24 @@ class TableGuru(utility.VerboseQuiet):
             germpl_t = GERMPLASM_TYPE
             self.sht.create_stock(fname, stocks, germpl_t, orga.genus,
                                   orga.species)
-            sheets.append(fname)
+            tasks.append(fname)
             self.vprint('[+] adding {}'.format(fname))
 
-        return sheets
+        return tasks
 
     def __check_and_add_sites(self):
         '''Creates MCL spreadsheets to upload the geolocation information.
 
         This functions refers to the chado 'nd_geolocation' table.
         '''
-        sheets = []
+        tasks = []
 
         sites = self.__get_needed_data('nd_geolocation')
 
         if sites:
             mandatory_cvts = ['type', 'country', 'state', 'region', 'address',
                               'site_code']
-            sheets += self.__check_and_add_cvterms(mandatory_cvts,
+            tasks += self.__check_and_add_cvterms(mandatory_cvts,
                                                    f_ext='pre_sites')
             # We need to split the data, for this spreadsheed.create*()
             names = [i['nd_geolocation.description'] for i in sites]
@@ -398,23 +399,23 @@ class TableGuru(utility.VerboseQuiet):
 
             fname = os.path.join(self.basedir, 'geoloc.xlsx')
             self.sht.create_geolocation(fname, names, alts, lats, longs)
-            sheets.append(fname)
+            tasks.append(fname)
 
-        return sheets
+        return tasks
 
     def __check_and_add_contacts(self):
         '''Creates MCL spreadsheets to upload the contact information.
 
         This functions refers to the chado 'contact' table.
         '''
-        sheets = []
+        tasks = []
 
         contacts = self.__get_needed_data('contact')
         if contacts:
             names = [i['contact.name'] for i in contacts]
             types = [i['contact.type_id'] for i in contacts]
 
-        return sheets
+        return tasks
 
     # TODO use 'pick_date' and 'plant_date'
     def __check_and_add_phenotypes(self):
@@ -423,12 +424,12 @@ class TableGuru(utility.VerboseQuiet):
         This functions refers to the chado 'phenotype' table.
         Ontology comes into the playground here. (self.onto, ..)
         '''
-        sheets = []
+        tasks = []
 
         phenotypic_data, raw_data = \
             self.__get_needed_data('phenotype', mapping='oracle', raw=True)
         if not phenotypic_data:
-            return sheets
+            return tasks
 
         # Get metadata, we need to link.
         tr_inv = utility.invert_dict(self.tr)
@@ -479,7 +480,7 @@ class TableGuru(utility.VerboseQuiet):
 
         # Check if all phenotypes exist already as cvterm, if not, add 'em.
         pheno_cvts = [i[1:] for i in descs[0].keys()] # strip the '#'
-        sheets += self.__check_and_add_cvterms(pheno_cvts, f_ext='pre_pheno')
+        tasks += self.__check_and_add_cvterms(pheno_cvts, f_ext='pre_pheno')
 
         # Looking in the first ontology mapping and then Chado, to find the
         # genus of Cassava. ('Manihot')
@@ -490,8 +491,8 @@ class TableGuru(utility.VerboseQuiet):
         fname = os.path.join(self.basedir, 'phenotyping_data.xlsx')
         self.sht.create_phenotype(fname, self.dataset, stocks, descs,
                                   other=others, genus=genus)
-        sheets.append(fname)
-        return sheets
+        tasks.append(fname)
+        return tasks
 
     def __get_trait_name(self, trait):
         '''Using self.onto.mapping, we create and return a nice trait name.

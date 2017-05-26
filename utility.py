@@ -84,6 +84,8 @@ class VerboseQuiet(object):
     '''To be inherited from.'''
     def __init__(self):
         self.printlock = threading.Lock()
+        self.VERBOSE = False
+        self.QUIET = False
     def vprint(self, s):
         '''Only print stuff, if we are in verbose mode.'''
         if hasattr(self, 'printlock'):
@@ -101,4 +103,14 @@ class VerboseQuiet(object):
             print s
         if hasattr(self, 'printlock'):
             self.printlock.release()
+
+class Task(object):
+    '''Used for multithreading implementation.'''
+    def __init__(self, name, job, *args=[], **kwargs={}):
+        self.name = name
+        self.job = job
+        self.args = args
+        self.kwargs = kwargs
+    def execute(self):
+        self.job(*self.args, **self.kwargs)
 

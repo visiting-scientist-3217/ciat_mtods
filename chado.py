@@ -7,6 +7,7 @@ import types            # used to copy has_.. functions
 import os               # environ -> db pw
 from utility import PostgreSQLQueries as PSQLQ
 from utility import make_namedtuple_with_query
+from StringIO import StringIO
 
 DB='drupal7'
 USER='drupal7'
@@ -107,6 +108,14 @@ class ChadoPostgres():
         result = make_namedtuple_with_query(self.c, sql, table, raw_result)
         return result
 
+    def __insert_into(table, values, columns=None):
+        '''INSERT INTO <table> (columns) VALUES (values).'''
+        if not type(values[0]) == list:
+            raise RuntimeError('expected values = [[...], [...], ...]')
+        sql = PSQLQ.insert_into_table
+        f = StringIO('\n'.join('\t'.join(str(v) for v in vs) for vs in values))
+        self.c.copy_from(f, table, columns)
+
     # Following function definitions where made manually, as the column name
     # differs from the standart name 'name'.
     def has_genus(self, name):
@@ -156,6 +165,10 @@ class ChadoPostgres():
     def create_phenotypes(self, data):
         '''...'''
         pass
+
+class ChadoDataLinker(object):
+    '''Links large list()s of data, ready for upload into Chado.'''
+    pass
 
 # META-BEGIN
 # Metaprogramming helper-function.
