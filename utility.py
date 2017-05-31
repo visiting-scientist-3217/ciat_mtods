@@ -104,13 +104,26 @@ class VerboseQuiet(object):
         if hasattr(self, 'printlock'):
             self.printlock.release()
 
-class Task(object):
+class Task(VerboseQuiet):
     '''Used for multithreading implementation.'''
-    def __init__(self, name, job, *args=[], **kwargs={}):
+    def __init__(self, name, job, *args, **kwargs):
+        super(self.__class__, self).__init__()
+        #self.VERBOSE = True
         self.name = name
         self.job = job
         self.args = args
         self.kwargs = kwargs
     def execute(self):
+        msg = '{}.execute()'
+        self.vprint(msg.format(self.__str__()[:40]+'...)'))
         self.job(*self.args, **self.kwargs)
+    def __str__(self):
+        s = 'Task(name={name}, job={job}, default_args={dargs},'\
+            + ' args={args}, kwargs={kwargs}'
+        s = s.format(name=self.name, job=self.job.func_name,
+                     dargs=self.job.func_defaults, args=self.args,
+                     kwargs=self.kwargs)
+        return s
+    def __repr__(self):
+        return self.__str__()
 

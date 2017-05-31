@@ -7,12 +7,18 @@ import types            # used to copy has_.. functions
 import os               # environ -> db pw
 from utility import PostgreSQLQueries as PSQLQ
 from utility import make_namedtuple_with_query
+from utility import Task
 from StringIO import StringIO
+from itertools import izip_longest as zip_pad
 
 DB='drupal7'
 USER='drupal7'
 HOST='127.0.0.1'
 PORT=5432
+
+CULTIVAR_WIKI='''\
+Germplasm Type: assemblage of plants select for desirable characteristics\
+'''
 
 class ChadoPostgres():
     '''You can ask questions about Chado once we have a connection to that
@@ -31,7 +37,7 @@ class ChadoPostgres():
     <where> used as where statement. If <where> is empty all rows are returned.
         .get_{table}(where='')
             , with {table} element [self.COMMON_TABLES, 'organism',
-                                    'nd_geolocation']
+                                    'nd_geolocation', 'dbxref']
     '''
     COMMON_TABLES = ['db', 'cv', 'cvterm', 'genotype', 'phenotype', 'project',
                      'stock', 'study']
@@ -108,13 +114,41 @@ class ChadoPostgres():
         result = make_namedtuple_with_query(self.c, sql, table, raw_result)
         return result
 
-    def __insert_into(table, values, columns=None):
-        '''INSERT INTO <table> (columns) VALUES (values).'''
-        if not type(values[0]) == list:
-            raise RuntimeError('expected values = [[...], [...], ...]')
+    @staticmethod
+    def insert_into(table, values, columns=None, cursor=None):
+        '''INSERT INTO <table> (columns) VALUES (values)
+        
+        Needs a cursor to execute the insert statement.
+        '''
+        if not type(values[0]) in [list, tuple]:
+            msg = 'expected values = [[...], [...], ...]\n\tbut received: {}'
+            msg = msg.format(str(values)[:50])
+            raise RuntimeError(msg)
+        if not cursor:
+            raise RuntimeError('need cursor object')
         sql = PSQLQ.insert_into_table
         f = StringIO('\n'.join('\t'.join(str(v) for v in vs) for vs in values))
-        self.c.copy_from(f, table, columns)
+        #columns = '('+','.join(columns)+')'
+        cursor.copy_from(f, table, columns=columns)
+
+    @staticmethod
+    def fetch_y_insert_into(fetch_stmt, values_constructor, *insert_args,
+                            **insert_kwargs):
+        '''Execute a query, join the values passed to the insert_into function
+        with the fetch()ed result.
+        
+        Note: We could do this as a single sql statement, but we have a lot of
+        data to handle, and we don't want to construct incredebly long strings.
+        '''
+        if not insert_kwargs.has_key('cursor'):
+            raise RuntimeError('need cursor object')
+        c = insert_kwargs['cursor']
+        c.execute(fetch_stmt)
+        fetch_res = c.fetchall()
+        # replaces values with the constructed join'ed ones
+        args = list(insert_args)
+        args[1] = values_constructor(insert_args[1], fetch_res)
+        ChadoPostgres.insert_into(*args, **insert_kwargs)
 
     # Following function definitions where made manually, as the column name
     # differs from the standart name 'name'.
@@ -151,24 +185,137 @@ class ChadoPostgres():
         if not self.con.autocommit:
             self.con.commit()
 
-    def delete_organism(self, genus, species):
-        '''Deletes all organisms, with given genus and species.'''
+    def __delete_where(self, table, condition):
+        '''DELETE FROM <table> WHERE <condition>'''
         sql = PSQLQ.delete_where
-        condition = '''genus = '{genus}' and species = '{species}' '''
-        condition = condition.format(genus=genus, species=species)
-        sql = sql.format(table='organism', cond=condition)
-
+        sql = sql.format(table=table, cond=condition)
         self.c.execute(sql)
         if not self.con.autocommit:
             self.con.commit()
 
-    def create_phenotypes(self, data):
-        '''...'''
-        pass
+    def delete_organism(self, genus, species):
+        '''Deletes all organisms, with given genus and species.'''
+        cond = '''genus = '{0}' and species = '{1}' '''
+        cond = cond.format(genus, species)
+        self.__delete_where('organism', cond)
+
+    def delete_cvterm(self, name, cv, and_dbxref=False):
+        '''Deletes all cvterms, with given name and cv.'''
+        cvs = self.get_cv(where="name = '{}'".format(cv))
+        if not len(cvs) == 1:
+            raise Warning('Ambiguous cvterm deletetion.')
+        cv_id = cvs[0].cv_id
+        cond = "name = '{0}' and cv_id = {1}".format(name, cv_id)
+        if and_dbxref:
+            cvts = self.get_cvterm(where=cond)
+        self.__delete_where('cvterm', cond)
+        if and_dbxref:
+            cond = "accession = '{}'".format(name)
+            self.__delete_where('dbxref', cond)
+
+    def delete_stock(self, stock):
+        cond = "uniquename = '{}'".format(stock)
+        self.__delete_where('stock', cond)
 
 class ChadoDataLinker(object):
-    '''Links large list()s of data, ready for upload into Chado.'''
-    pass
+    '''Links large list()s of data, ready for upload into Chado.
+    
+    The create_* functions return Task-objects, that when execute()d, will link
+    and upload the given data into the chado schema.
+    '''
+
+    # Note: order matters, as we zip() dbxrefs at the end v 
+    CVTERM_COLS = ['cv_id', 'definition', 'name', 'dbxref_id']
+    DBXREF_COLS = ['db_id', 'accession']
+    STOCK_COLS  = ['organism_id', 'name', 'uniquename', 'type_id']
+
+    def __init__(self, chado, dbname, cvname):
+        self.db = dbname
+        self.cv = cvname
+        self.chado = chado
+        self.con = chado.con
+        self.c = self.con.cursor()
+
+    def create_cvterm(self, cvterm, accession=[], definition=[], tname=None):
+        '''Create (possibly multiple) Tasks to upload cvterms.'''
+        if not accession:
+            accession = cvterm
+        if len(cvterm) != len(accession) or \
+                definition and len(cvterm) != len(definition):
+            raise RuntimeError('argument length unequal!')
+
+        cv_id = self.chado.get_cv(where="name = '{}'".format(self.cv))[0].cv_id
+        db_id = self.chado.get_db(where="name = '{}'".format(self.db))[0].db_id
+        all_dbxrefs = self.chado.get_dbxref(where="db_id = '{}'".format(db_id))
+        curr_dbxrefs = [d.accession for d in all_dbxrefs]
+        needed_dbxrefs = [a for a in accession if not a in curr_dbxrefs]
+
+        content = [[db_id, a] for a in needed_dbxrefs]
+        name = 'dbxref upload'
+        if tname: name = name + '({})'.format(tname)
+        f = self.chado.insert_into
+        args = ('dbxref', content, self.DBXREF_COLS)
+        kwargs = {'cursor' : self.con.cursor()} # new cursor() for every Task
+        t1_dbxref = Task(name, f, *args, **kwargs)
+
+        # Note: Scary code. We don't know dbxref_id's but still want to use
+        # the copy_from upload, or at least an execute query that uploads all
+        # our data at once, and not upload 1 dbxref, 1 cvterm at a time.
+
+        # cvterm names will be added later to <content> in order to ensure
+        # correct ordering, because we don't know the dbxref_id yet
+        if definition:
+            it = zip(cvterm, definition)
+            content = [[cv_id, de] for c,de in it] 
+        else:
+            content = [[cv_id, ''] for c in cvterm]
+        name = 'cvterm upload'
+        if tname: name = name + '({})'.format(tname)
+        f = self.chado.fetch_y_insert_into # XXX add fetch..
+        fstmt = '''\
+            SELECT accession,dbxref_id
+                FROM dbxref JOIN (VALUES {}) v ON v.column1 = dbxref.accession
+        '''
+        fstmt = fstmt.format(','.join("('{}')".format(v) for v in cvterm))
+        def join_func(x, y):
+            return [[i[0],i[1],j[0],j[1]] for i,j in zip(x,y)]
+        args = (fstmt, join_func, 'cvterm', content, self.CVTERM_COLS)
+        kwargs = {'cursor' : self.con.cursor()}
+        t2_cvt = Task(name, f, *args, **kwargs)
+        return (t1_dbxref, t2_cvt) # tuple = enforce sequencial execution
+
+    def create_stock(self, stocks, organism, tname=None, germplasm_t='cultivar'):
+        '''Create (possibly multiple) Tasks to upload stocks.'''
+        where = 'name = \'{}\''.format(germplasm_t)
+        cvt = self.chado.get_cvterm(where=where)[0]
+        if not cvt:
+            for t in self.create_cvterm([germplasm_t],
+                                        definition=[CULTIVAR_WIKI]):
+                t.execute()
+            cvt = self.chado.get_cvterm(where=where)[0]
+        type_id = cvt.cvterm_id
+        o_id = organism.organism_id
+        content = [[o_id, s, s, type_id] for s in stocks]
+        args = ('stock', content, self.STOCK_COLS)
+        kwargs = {'cursor' : self.con.cursor()}
+        f = self.chado.insert_into
+        name = 'stock upload'
+        if tname: name = name + '({})'.format(tname)
+        t = Task(name, f, *args, **kwargs)
+        return (t,)
+        #return [Task('Empty', lambda a,b: None, [], {})]
+
+    def create_geolocation(self, sites, tname=None):
+        '''Create (possibly multiple) Tasks to upload geolocations.'''
+        content = [[]]
+        args = ()
+        kwargs = {'cursor' : self.con.cursor()}
+        f = self.chado.insert_into
+        name = 'geolocation upload'
+        if tname: name = name + '({})'.format(tname)
+        t = Task(name, f, *args, **kwargs)
+        #return (t)
+        return [Task('Empty', lambda a,b: None, [], {})]
 
 # META-BEGIN
 # Metaprogramming helper-function.
@@ -192,7 +339,7 @@ for table in ChadoPostgres.COMMON_TABLES:
 
 # Create convenient methods:
 #   .get_db() .get_cv() .get_..
-for table in ChadoPostgres.COMMON_TABLES + ['organism', 'nd_geolocation']:
+for table in ChadoPostgres.COMMON_TABLES + ['organism', 'nd_geolocation', 'dbxref']:
     prefix = 'get_'
     newfget_name = prefix+table
     if not hasattr(ChadoPostgres, newfget_name):

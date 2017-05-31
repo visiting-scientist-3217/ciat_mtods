@@ -1,6 +1,5 @@
 import utility
 from utility import OracleSQLQueries as OSQL
-from utility import Task
 import chado
 import cassava_ontology
 import ConfigParser
@@ -62,6 +61,8 @@ class TableGuru(utility.VerboseQuiet):
         self.c = oracledb.cur
         self.chado = chado.ChadoPostgres()
         self.onto = cassava_ontology.CassavaOntology(self.c)
+
+        self.linker = chado.ChadoDataLinker(self.chado, chado_db, chado_cv)
 
         self.table = table
         self.dbname = chado_db
@@ -323,8 +324,8 @@ class TableGuru(utility.VerboseQuiet):
             if len(cur) == 0:
                 continue
             if len(cur) != 1: # Well crap.
-                msg = '[.__check_and_add_cvterms] Did not find excactly'\
-                    + ' one cvterm, for a single needed name: {c} -> {d}'
+                msg = 'Did not find excactly one cvterm, for a single needed'\
+                    + ' name: {c} -> {d}'
                 self.qprint(msg.format(c=cvt, d=cur))
                 cur = [cur[0]]
             needed_onto += cur
@@ -341,67 +342,41 @@ class TableGuru(utility.VerboseQuiet):
             cvt_ns = needed_cvts
             cvt_ds = []
 
-        bname = 'cvterms_{ext}.xlsx'.format(ext=f_ext+'{}')
-        fname = os.path.join(self.basedir, bname.format(''))
-        if os.path.exists(fname):
-            for i in range(10):
-                fname = os.path.join(self.basedir, bname.format(i))
-                if not os.path.exists(fname):
-                    break
-            else:
-                raise RuntimeError('Too manny cvterm uploads. (>10)')
-
-        self.sht.create_cvterm(fname, self.dbname, self.cvname, cvt_ns,
-                                definition=cvt_ds)
-        tasks.append(fname)
-        return tasks
+        return self.linker.create_cvterm(self.dbname, self.cvname, cvt_ns,
+                                         definition=cvt_ds, tname=f_ext)
 
     def __check_and_add_stocks(self):
         '''Tasks to upload the genexpression information.
 
         This functions refers to the chado 'stock' table.
         '''
-        tasks = []
-
         stocks = self.__get_needed_data('stock')
 
         if stocks:
             stocks = [(i['stock.uniquename'], i['stock.name']) for i in stocks]
             orga = self.chado.get_organism(where="common_name = 'Cassava'")[0]
-            fname = os.path.join(self.basedir, 'stocks.xlsx')
-            germpl_t = GERMPLASM_TYPE
-            self.sht.create_stock(fname, stocks, germpl_t, orga.genus,
-                                  orga.species)
-            tasks.append(fname)
-            self.vprint('[+] adding {}'.format(fname))
-
-        return tasks
+            germpl_t = GERMPLASM_TYPE # < TODO remove hardcoding   ^
+            return self.linker.create_stock(stocks, germpl_t, orga)
 
     def __check_and_add_sites(self):
         '''Creates MCL spreadsheets to upload the geolocation information.
 
         This functions refers to the chado 'nd_geolocation' table.
         '''
-        tasks = []
-
         sites = self.__get_needed_data('nd_geolocation')
 
         if sites:
             mandatory_cvts = ['type', 'country', 'state', 'region', 'address',
                               'site_code']
-            tasks += self.__check_and_add_cvterms(mandatory_cvts,
-                                                   f_ext='pre_sites')
-            # We need to split the data, for this spreadsheed.create*()
-            names = [i['nd_geolocation.description'] for i in sites]
-            alts = [i['nd_geolocation.altitude'] for i in sites]
-            lats = [i['nd_geolocation.latitude'] for i in sites]
-            longs = [i['nd_geolocation.longitude'] for i in sites]
-
-            fname = os.path.join(self.basedir, 'geoloc.xlsx')
-            self.sht.create_geolocation(fname, names, alts, lats, longs)
-            tasks.append(fname)
-
-        return tasks
+            t1 = self.__check_and_add_cvterms(mandatory_cvts, f_ext='pre_sites')
+            t2 = self.linker.create_geolocation(sites)
+            return (t1, t2)
+            # We don't need to split the data anymore, cuz no spreadsheed
+            #names = [i['nd_geolocation.description'] for i in sites]
+            #alts = [i['nd_geolocation.altitude'] for i in sites]
+            #lats = [i['nd_geolocation.latitude'] for i in sites]
+            #longs = [i['nd_geolocation.longitude'] for i in sites]
+            #t2 = self.linker.create_geolocation(names, alts, lats, longs)
 
     def __check_and_add_contacts(self):
         '''Creates MCL spreadsheets to upload the contact information.
@@ -489,8 +464,8 @@ class TableGuru(utility.VerboseQuiet):
         genus = self.chado.get_organism(where=where)[0].genus
 
         fname = os.path.join(self.basedir, 'phenotyping_data.xlsx')
-        self.sht.create_phenotype(fname, self.dataset, stocks, descs,
-                                  other=others, genus=genus)
+        self.linker.create_phenotype(fname, self.dataset, stocks, descs,
+                                     other=others, genus=genus)
         tasks.append(fname)
         return tasks
 
@@ -542,6 +517,11 @@ class TableGuru(utility.VerboseQuiet):
         t.update({'sites' : self.__check_and_add_sites()})
         t.update({'contacts' : self.__check_and_add_contacts()})
         t.update({'phenos' : self.__check_and_add_phenotypes()})
+
+        # Replace None values with dummies.
+        for k,v in t.itervalues():
+            if v is None:
+                t[k] = Task('Empty', lambda: None, [], {})
 
         # we are done with it
         del self.data

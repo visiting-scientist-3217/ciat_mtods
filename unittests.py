@@ -19,17 +19,43 @@ if not os.path.exists(PATH):
 # Half-Global connections to speed things up a lot.
 # Note that the other test will use these connections.
 class ConTest(unittest.TestCase):
+    # Get Chado-,Oracle -DB connections, and the Ontology
     chadodb = chado.ChadoPostgres(host='127.0.0.1', usr='drupal7')
+    linker = chado.ChadoDataLinker(chadodb, 'mcl_pheno', 'mcl_pheno')
     oracledb = cx_oracle.Oracledb()
     oracledb.connect()
     cass_onto = cassava_ontology.CassavaOntology(oracledb.cur)
+    # Asure we got it.
     def test_connections_not_none(self):
         self.assertIsNotNone(self.chadodb)
         self.assertIsNotNone(self.oracledb)
         self.assertIsNotNone(self.oracledb.con)
         self.assertIsNotNone(self.oracledb.cur)
+        self.assertIsNotNone(self.linker)
 
 class PostgreTests(unittest.TestCase):
+    longMessage = True
+
+    # set variables used in tearDown
+    @classmethod
+    def setUpClass(cls):
+        cls.cvts = ['abc', 'def']
+        cls.stocks = ['12 GM 2319023 z', '12 GM 2319023 lsd']
+        cls.sites = [
+                {'nd_geolocation.description' : 'asdfAA',
+                 'nd_geolocation.altitude'    : '1',
+                 'nd_geolocation.latitude'    : '40',
+                 'nd_geolocation.longitude'   : '73'},
+            ]
+ 
+    # remove all the things after every test..
+    def tearDown(self):
+        for c in self.cvts:
+            ConTest.chadodb.delete_cvterm(c, cv=ConTest.linker.cv,
+                                          and_dbxref=True)
+        for s in self.stocks:
+            ConTest.chadodb.delete_stock(s)
+
     def test_organism_funcs(self):
         genus = 'test_genus'
         species = 'test_species'
@@ -39,6 +65,48 @@ class PostgreTests(unittest.TestCase):
         ConTest.chadodb.delete_organism(genus, species)
         self.assertFalse(ConTest.chadodb.has_species(species))
         self.assertFalse(ConTest.chadodb.has_genus(genus))
+
+    def test_cvterm_tasks(self):
+        ts = ConTest.linker.create_cvterm(self.cvts)
+        pre_len = len(ConTest.chadodb.get_cvterm())
+        for t in ts:
+            t.execute()
+        post_len = len(ConTest.chadodb.get_cvterm())
+        msg = 'creation of cvterms failed'
+        self.assertEqual(pre_len + 2, post_len, msg)
+        cvterms = [i.name for i in ConTest.chadodb.get_cvterm()]
+        self.assertIn(self.cvts[0], cvterms, msg)
+        self.assertIn(self.cvts[1], cvterms, msg)
+        msg = 'creation of dbxref accession failed'
+        dbxrefs = [i.accession for i in ConTest.chadodb.get_dbxref()]
+        self.assertIn(self.cvts[0], dbxrefs, msg)
+        self.assertIn(self.cvts[1], dbxrefs, msg)
+
+    def test_stock_tasks(self):
+        organism = ConTest.chadodb.get_organism()[0]
+        ts = ConTest.linker.create_stock(self.stocks, organism)
+
+        pre_len = len(ConTest.chadodb.get_stock())
+        for t in ts:
+            t.execute()
+        post_len = len(ConTest.chadodb.get_stock())
+        msg = 'creation of stocks failed'
+        self.assertEqual(pre_len + 2, post_len, msg)
+        stocks = [i.uniquename for i in ConTest.chadodb.get_stock()]
+        self.assertIn(self.stocks[0], stocks, msg)
+        self.assertIn(self.stocks[1], stocks, msg)
+
+    def test_geolocation_tasks(self):
+        ts = ConTest.linker.create_geolocation(self.sites)
+        pre_len = len(ConTest.chadodb.get_nd_geolocation())
+        for t in ts:
+            t.execute()
+        post_len = len(ConTest.chadodb.get_nd_geolocation())
+        msg = 'creation of geolocations failed'
+        self.assertEqual(pre_len + 2, post_len, msg)
+        sts = [i.description for i in ConTest.chadodb.get_nd_geolocation()]
+        self.assertIn(self.sites[0], sts, msg)
+        self.assertIn(self.sites[1], sts, msg)
 
 class OracleTests(unittest.TestCase):
     longMessage = True # Append my msg to default msg.
@@ -51,14 +119,12 @@ class OracleTests(unittest.TestCase):
         self.assertEqual(len(onto_sp), 24, 'Size changed, interesting.')
         self.assertEqual(len(onto), len(set(onto)), 'Double entries, bad!')
 
-# To enable this, set enableThisMonoliticTestWithLongDuration to True.
 class BigTest(unittest.TestCase):
     '''Monolitic tests, building up some state.'''
+    enableThisMonoliticTestWithLongDuration = False
+
     # Append my msg to default msg.
     longMessage = True 
-
-    # Create spreadsheets for a real migration.
-    enableThisMonoliticTestWithLongDuration = True
 
     # Number of lines imported, this should directly correlate to the added
     # rows of phenotyping data in chado. If 'None' all data will be used.

@@ -3,6 +3,7 @@ import utility
 import os
 import table_guru
 import threading
+from utility import Task
 
 # Note: this v is not the official cx_Oracle library, but a convenient wrapper.
 import cx_oracle
@@ -103,6 +104,14 @@ class Migration(utility.VerboseQuiet):
             map(lambda x: x.join(), ts)
         else:
             self.vprint('[+] starting upload: {}'.format(tasks))
+            tasks.execute()
+
+    def __non_parallel_upload(self, tasks):
+        '''Non parallel upload for testing purposes.'''
+        if not tasks is Task:
+            for t in tasks:
+                self.__non_parallel_upload(t)
+        else:
             tasks.execute()
 
     def full(self, basedir=BASE_DIR):
