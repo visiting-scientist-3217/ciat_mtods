@@ -37,7 +37,7 @@ class ChadoPostgres():
     <where> used as where statement. If <where> is empty all rows are returned.
         .get_{table}(where='')
             , with {table} element [self.COMMON_TABLES, 'organism',
-                                    'nd_geolocation', 'dbxref']
+                                    'nd_geolocation', 'dbxref', 'stockprop']
     '''
     COMMON_TABLES = ['db', 'cv', 'cvterm', 'genotype', 'phenotype', 'project',
                      'stock', 'study']
@@ -217,6 +217,24 @@ class ChadoPostgres():
         cond = "uniquename = '{}'".format(stock)
         self.__delete_where('stock', cond)
 
+    def delete_geolocation(self, site='', keys={}):
+        '''<keys> are concatenated and "AND"-ed as =equal= conditions to the
+        delete condition, site ist checked against 'description'.
+        '''
+        if site:
+            cond = "description = '{}'".format(site)
+        else: 
+            cond = '1=1'
+        if keys:
+            ndg = 'nd_geolocation.'
+            for k,v in keys.iteritems():
+                if k.startswith(ndg): k = k.split(ndg)[1]
+                cond = cond + " and {col} = '{val}'".format(col=k, val=v)
+        self.__delete_where('nd_geolocation', cond)
+
+    def delete_phenotype(self, pheno):
+        pass
+
 class ChadoDataLinker(object):
     '''Links large list()s of data, ready for upload into Chado.
     
@@ -228,6 +246,8 @@ class ChadoDataLinker(object):
     CVTERM_COLS = ['cv_id', 'definition', 'name', 'dbxref_id']
     DBXREF_COLS = ['db_id', 'accession']
     STOCK_COLS  = ['organism_id', 'name', 'uniquename', 'type_id']
+    GEOLOC_COLS = ['description', 'latitude', 'longitude', 'altitude']
+    PHENO_COLS  = ['uniquename', 'attr_id', 'value']
 
     def __init__(self, chado, dbname, cvname):
         self.db = dbname
@@ -303,18 +323,33 @@ class ChadoDataLinker(object):
         if tname: name = name + '({})'.format(tname)
         t = Task(name, f, *args, **kwargs)
         return (t,)
-        #return [Task('Empty', lambda a,b: None, [], {})]
 
     def create_geolocation(self, sites, tname=None):
         '''Create (possibly multiple) Tasks to upload geolocations.'''
-        content = [[]]
-        args = ()
+        # Our translator creates this funny format, deal with it.
+        content = [[i['nd_geolocation.description'],
+                    i['nd_geolocation.latitude'],
+                    i['nd_geolocation.longitude'], i['nd_geolocation.altitude']]
+                    for i in sites]
+        args = ('nd_geolocation', content, self.GEOLOC_COLS)
         kwargs = {'cursor' : self.con.cursor()}
         f = self.chado.insert_into
         name = 'geolocation upload'
         if tname: name = name + '({})'.format(tname)
         t = Task(name, f, *args, **kwargs)
-        #return (t)
+        return (t,)
+
+    def create_stockprop(self, props, tname=None):
+        #content = [[s,t,v] for s,t,v in zip(stock_ids, type_ids, values)]
+        return [Task('Empty', lambda a,b: None, [], {})]
+
+    def create_phenotype(self, phenos, tname=None):
+        name = 'phenotype upload'
+        #content = [[n, a, v] for n,a,v in zip(uniqs, attrs, vals)]
+        args = ('phenotype', content, self.PHENO_COLS)
+        kwargs = {'cursor' : self.con.cursor()}
+        if tname: name = name + '({})'.format(tname)
+        t = Task(name, f, *args, **kwargs)
         return [Task('Empty', lambda a,b: None, [], {})]
 
 # META-BEGIN
@@ -339,7 +374,8 @@ for table in ChadoPostgres.COMMON_TABLES:
 
 # Create convenient methods:
 #   .get_db() .get_cv() .get_..
-for table in ChadoPostgres.COMMON_TABLES + ['organism', 'nd_geolocation', 'dbxref']:
+for table in ChadoPostgres.COMMON_TABLES + ['organism', 'nd_geolocation',
+        'dbxref', 'stockprop']:
     prefix = 'get_'
     newfget_name = prefix+table
     if not hasattr(ChadoPostgres, newfget_name):

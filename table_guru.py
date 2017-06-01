@@ -399,18 +399,22 @@ class TableGuru(utility.VerboseQuiet):
         This functions refers to the chado 'phenotype' table.
         Ontology comes into the playground here. (self.onto, ..)
         '''
-        tasks = []
-
         phenotypic_data, raw_data = \
             self.__get_needed_data('phenotype', mapping='oracle', raw=True)
         if not phenotypic_data:
-            return tasks
+            return []
 
         # Get metadata, we need to link.
         tr_inv = utility.invert_dict(self.tr)
 
         # stocks needs to be passed as aditional argument
         stocks = [getattr(i, tr_inv['stock.name']) for i in raw_data]
+
+        # === Plan of Action ===
+        # - remove <others>
+        # - create_geolocation
+        # - create_stockprop
+        # - create_cvterm
 
         others = []
         for i in raw_data:

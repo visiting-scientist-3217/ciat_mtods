@@ -46,15 +46,28 @@ class PostgreTests(unittest.TestCase):
                  'nd_geolocation.altitude'    : '1',
                  'nd_geolocation.latitude'    : '40',
                  'nd_geolocation.longitude'   : '73'},
+                {'nd_geolocation.description' : 'asdfAAr2',
+                 'nd_geolocation.altitude'    : '2',
+                 'nd_geolocation.latitude'    : '38',
+                 'nd_geolocation.longitude'   : '87'},
             ]
+        cls.phenos = [
+                '',
+            ]
+        cls.props = []
  
-    # remove all the things after every test..
-    def tearDown(self):
-        for c in self.cvts:
+    # remove all the things
+    @classmethod
+    def tearDownClass(cls):
+        for c in cls.cvts:
             ConTest.chadodb.delete_cvterm(c, cv=ConTest.linker.cv,
                                           and_dbxref=True)
-        for s in self.stocks:
+        for s in cls.stocks:
             ConTest.chadodb.delete_stock(s)
+        for g in cls.sites:
+            ConTest.chadodb.delete_geolocation(keys=g)
+        for p in cls.phenos:
+            ConTest.chadodb.delete_phenotype(p)
 
     def test_organism_funcs(self):
         genus = 'test_genus'
@@ -105,8 +118,25 @@ class PostgreTests(unittest.TestCase):
         msg = 'creation of geolocations failed'
         self.assertEqual(pre_len + 2, post_len, msg)
         sts = [i.description for i in ConTest.chadodb.get_nd_geolocation()]
-        self.assertIn(self.sites[0], sts, msg)
-        self.assertIn(self.sites[1], sts, msg)
+        self.assertIn(self.sites[0]['nd_geolocation.description'], sts, msg)
+        self.assertIn(self.sites[1]['nd_geolocation.description'], sts, msg)
+
+    def test_phenotype_tasks(self):
+        ts = ConTest.linker.create_phenotype(self.phenos)
+        pre_len = len(ConTest.chadodb.get_phenotype())
+        for t in ts:
+            t.execute()
+        post_len = len(ConTest.chadodb.get_phenotype())
+        msg = 'creation of phenotypes failed, expecting at least 3 valid'\
+            + ' traits for the 2 testuploads'
+        self.assertGreaterEqual(post_len, pre_len + (2*3), msg)
+
+    def test_stockprop_tasks(self):
+        ts = ConTest.linker.create_stockprop(self.props)
+        pre_len = len(ConTest.chadodb.get_stockprop())
+        for t in ts:
+            t.execute()
+        post_len = len(ConTest.chadodb.get_stockprop())
 
 class OracleTests(unittest.TestCase):
     longMessage = True # Append my msg to default msg.
