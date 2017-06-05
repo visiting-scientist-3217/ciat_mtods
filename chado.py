@@ -5,11 +5,13 @@ import psycopg2 as psql
 import getpass
 import types            # used to copy has_.. functions
 import os               # environ -> db pw
+import re
 from utility import PostgreSQLQueries as PSQLQ
 from utility import make_namedtuple_with_query
 from utility import Task
 from StringIO import StringIO
 from itertools import izip_longest as zip_pad
+from random import randint
 
 DB='drupal7'
 USER='drupal7'
@@ -134,12 +136,22 @@ class ChadoPostgres():
     @staticmethod
     def fetch_y_insert_into(fetch_stmt, values_constructor, *insert_args,
                             **insert_kwargs):
-        '''Execute a query, join the values passed to the insert_into function
-        with the fetch()ed result.
+        '''Execute a query, replace insert_args[1], which are the values,
+        passed to the insert_into function with the result of the
+        values_constructor function function, given the the original
+        insert_args[1] and the result of the fetch_stmt statement as argument.
+            args[1] = values_constructor(insert_args[1], fetch_result)
         
+        <insert_kwargs> must contain a key called 'cursor' with a valid
+        db-cursor as value.
+
         Note: We could do this as a single sql statement, but we have a lot of
-        data to handle, and we don't want to construct incredebly long strings.
+        data to handle, and we don't want to construct incredebly long
+        INSERT-statements. Like this we only construct moderately long
+        SELECT-statements.
         '''
+        print '[fetch_y_insert_into] args:', insert_args
+        print '[fetch_y_insert_into] kwargs:', insert_kwargs
         if not insert_kwargs.has_key('cursor'):
             raise RuntimeError('need cursor object')
         c = insert_kwargs['cursor']
@@ -150,8 +162,8 @@ class ChadoPostgres():
         args[1] = values_constructor(insert_args[1], fetch_res)
         ChadoPostgres.insert_into(*args, **insert_kwargs)
 
-    # Following function definitions where made manually, as the column name
-    # differs from the standart name 'name'.
+    # Following function definitions where made manually, as the identifying
+    # column name differs from 'name'
     def has_genus(self, name):
         '''See __tab_contains'''
         return self.__tab_contains(name, table='organism', column='genus')
@@ -243,11 +255,16 @@ class ChadoDataLinker(object):
     '''
 
     # Note: order matters, as we zip() dbxrefs at the end v 
-    CVTERM_COLS = ['cv_id', 'definition', 'name', 'dbxref_id']
-    DBXREF_COLS = ['db_id', 'accession']
-    STOCK_COLS  = ['organism_id', 'name', 'uniquename', 'type_id']
-    GEOLOC_COLS = ['description', 'latitude', 'longitude', 'altitude']
-    PHENO_COLS  = ['uniquename', 'attr_id', 'value']
+    CVTERM_COLS     = ['cv_id', 'definition', 'name', 'dbxref_id']
+    DBXREF_COLS     = ['db_id', 'accession']
+    STOCK_COLS      = ['organism_id', 'name', 'uniquename', 'type_id']
+    STOCKPROP_COLS  = ['stock_id', 'type_id', 'value']
+    GEOLOC_COLS     = ['description', 'latitude', 'longitude', 'altitude']
+    PHENO_COLS      = ['uniquename', 'attr_id', 'value'] # not const
+    EXP_COLS        = ['nd_geolocation_id', 'type_id']
+
+    # implemented stockprop's which might occur in the phenotyping metadata
+    STOCKPROPS = ('pick_date', 'plant_date')
 
     def __init__(self, chado, dbname, cvname):
         self.db = dbname
@@ -289,9 +306,6 @@ class ChadoDataLinker(object):
             content = [[cv_id, de] for c,de in it] 
         else:
             content = [[cv_id, ''] for c in cvterm]
-        name = 'cvterm upload'
-        if tname: name = name + '({})'.format(tname)
-        f = self.chado.fetch_y_insert_into # XXX add fetch..
         fstmt = '''\
             SELECT accession,dbxref_id
                 FROM dbxref JOIN (VALUES {}) v ON v.column1 = dbxref.accession
@@ -299,10 +313,28 @@ class ChadoDataLinker(object):
         fstmt = fstmt.format(','.join("('{}')".format(v) for v in cvterm))
         def join_func(x, y):
             return [[i[0],i[1],j[0],j[1]] for i,j in zip(x,y)]
-        args = (fstmt, join_func, 'cvterm', content, self.CVTERM_COLS)
-        kwargs = {'cursor' : self.con.cursor()}
+
+        name = 'cvterm upload'
+        if tname: name = name + '({})'.format(tname)
+        f = self.chado.fetch_y_insert_into # XXX add fetch..
+        insert_args = ['cvterm', content, self.CVTERM_COLS]
+        insert_kwargs = {'cursor' : self.con.cursor()}
+        args = [fstmt, join_func]
+        args += insert_args
+        kwargs = {}
+        kwargs.update(insert_kwargs)
         t2_cvt = Task(name, f, *args, **kwargs)
         return (t1_dbxref, t2_cvt) # tuple = enforce sequencial execution
+
+    def __get_or_create_cvterm(self, term):
+        '''Returns the cvterm named <term>, if it does not exist, we create it
+        first.
+        '''
+        ts = self.create_cvterm([term], accession=[acs], tname='__get_or_create')
+        for t in ts: t.execute()
+        cvterm = self.chado.get_cvterm(where='name = {}'.format(term))[0]
+        if not cvterm: raise RuntimeError('cvterm creation failed!')
+        return cvterm
 
     def create_stock(self, stocks, organism, tname=None, germplasm_t='cultivar'):
         '''Create (possibly multiple) Tasks to upload stocks.'''
@@ -316,41 +348,199 @@ class ChadoDataLinker(object):
         type_id = cvt.cvterm_id
         o_id = organism.organism_id
         content = [[o_id, s, s, type_id] for s in stocks]
-        args = ('stock', content, self.STOCK_COLS)
-        kwargs = {'cursor' : self.con.cursor()}
-        f = self.chado.insert_into
+
         name = 'stock upload'
         if tname: name = name + '({})'.format(tname)
+        f = self.chado.insert_into
+        args = ('stock', content, self.STOCK_COLS)
+        kwargs = {'cursor' : self.con.cursor()}
         t = Task(name, f, *args, **kwargs)
         return (t,)
 
+    def __check_coords(self, ignore_me, lat, lon, alt):
+        ''''''
+        r = []
+        for i in [lat, lon, alt]:
+            try: 
+                i = re.sub(r'^\s*0*', '', i)
+                i = re.sub(r'([0-9]*)[NE]', '+\\1', i)
+                i = re.sub(r'([0-9]*)[SW]', '-\\1', i)
+            except TypeError, ValueError:
+                # Either we found a plain int() or the first
+                # substitution was already successfull, and the second
+                # fails, which is both fine.
+                pass
+            finally:
+                r.append(i)
+        r.insert(0, ignore_me)
+        return r
+
     def create_geolocation(self, sites, tname=None):
         '''Create (possibly multiple) Tasks to upload geolocations.'''
+        name = 'geolocation upload'
+        if tname: name = name + '({})'.format(tname)
         # Our translator creates this funny format, deal with it.
-        content = [[i['nd_geolocation.description'],
-                    i['nd_geolocation.latitude'],
-                    i['nd_geolocation.longitude'], i['nd_geolocation.altitude']]
+        content = [self.__check_coords(i['nd_geolocation.description'],
+                                       i['nd_geolocation.latitude'],
+                                       i['nd_geolocation.longitude'],
+                                       i['nd_geolocation.altitude'])
                     for i in sites]
         args = ('nd_geolocation', content, self.GEOLOC_COLS)
         kwargs = {'cursor' : self.con.cursor()}
         f = self.chado.insert_into
-        name = 'geolocation upload'
-        if tname: name = name + '({})'.format(tname)
         t = Task(name, f, *args, **kwargs)
         return (t,)
 
-    def create_stockprop(self, props, tname=None):
-        #content = [[s,t,v] for s,t,v in zip(stock_ids, type_ids, values)]
-        return [Task('Empty', lambda a,b: None, [], {})]
+    def create_stockprop(self, props, ptype='', tname=None):
+        '''Create (possibly multiple) Tasks to upload stocks.
 
-    def create_phenotype(self, phenos, tname=None):
-        name = 'phenotype upload'
-        #content = [[n, a, v] for n,a,v in zip(uniqs, attrs, vals)]
-        args = ('phenotype', content, self.PHENO_COLS)
-        kwargs = {'cursor' : self.con.cursor()}
+        Pass props = [['name0', 'val0'], ['name1', 'val1'], ...]
+        <ptype> is a string, that meanst one call per property
+        '''
+        # get the stockprop type_id, possibly create it first
+        if not ptype:
+            raise RuntimeError('You need to specify a stockprop type.')
+        where = "name = '{}'".format(ptype)
+        try:
+            type_id = self.chado.get_cvterm(where=where)[0].cvterm_id
+        except IndexError:
+            ts = self.create_cvterm([ptype], definition=['stockprop'])
+            for t in ts: t.execute()
+            type_id = self.chado.get_cvterm(where=where)[0].cvterm_id
+
+        # get stock_ids joined with the values
+        sql = "SELECT stock_id,uniquename FROM stock WHERE uniquename = {}"
+        vals = ','.join("'{}'".format(p[0]) for p in props)
+        where = 'ANY(ARRAY[{}])'.format(vals)
+        sql = sql.format(where)
+        self.chado.c.execute(sql)
+        stocks = sorted(self.chado.c.fetchall(), key=lambda x: x[1])
+        props = sorted(props, key=lambda x: x[0])
+        if not len(stocks) == len(props):
+            raise RuntimeError('unequal stocks/stockprops, unlikely')
+        join = zip(stocks, props)
+        content = [[sck[0],type_id,prp[1]] for sck,prp in join]
+        #               ^ stock_id     ^ value
+        name = 'stockprop upload'
         if tname: name = name + '({})'.format(tname)
+        f = self.chado.insert_into
+        args = ('stockprop', content, self.STOCKPROP_COLS)
+        kwargs = {'cursor' : self.con.cursor()}
         t = Task(name, f, *args, **kwargs)
-        return [Task('Empty', lambda a,b: None, [], {})]
+        return (t,)
+
+    def __t1_create_stockprop(self, other, tname):
+        t_stockprop = [Task.init_empty()]
+        for stockprop in self.STOCKPROPS:
+            if other[0].has_key(stockprop):
+                props = [i[stockprop] for i in other]
+                t = self.create_stockprop(props, stockprop, tname=stockprop)
+                t_stockprop.append(t)
+        return t_stockprop
+
+    def __construct_rnd(self, i, v):
+        s = '{0}_{1}_{2}'
+        return s.format(i,v,randint(1024,1048576))
+
+    def __t2_create_phenoes(self, stocks, descs, tname):
+        t_phenos = [Task.init_empty()] # all in parallel!
+        for descriptor in descs.keys():
+            content = []
+            name = 'phenotype upload'
+            if tname: name = name + '({})'.format(tname)
+            name = name + '({})'.format(descriptor)
+            attr_id = self.__get_or_create_cvterm(descriptor).attr_id
+            values = [i[descriptor] for i in descs]
+            uniqs = [self.__construct_rnd(attr_id, i) for i in values] # TODO rly unique?
+            content = [[n, attr_id, v] for n, v in zip(uniqs, values)]
+            args = ('phenotype', content, self.PHENO_COLS)
+            kwargs = {'cursor' : self.con.cursor()}
+            if tname: name = name + '({})'.format(tname)
+            t_phenos.append(Task(name, f, *args, **kwargs))
+        return t_phenos
+
+    def __t3_create_experiments(self, others, stocks):
+        gs = []
+        for i in others:
+            if hasattr(i, 'site_name'):
+                n = i['site_name']
+            else:
+                n = 'Not Available'
+            gs.append(n)
+        geo_n_stock = ["('{0}','{1}')".format(i,j) for i,j in zip(gs,stocks)]
+        stmt = '''
+            SELECT g.nd_geolocation_id,s.stock_id FROM (VALUES {}) v
+                JOIN nd_geolocation g ON v.column1 = g.description
+                JOIN stock s ON v.column2 = stock.uniquename
+        '''
+        stmt = stmt.format(','.join(geo_n_stock))
+
+        def join_func(_, stmt_res):
+            return stmt_res # geolocation_id,stock_id
+
+        name = 'cvterm upload'
+        if tname: name = name + '({})'.format(tname)
+        f = self.chado.fetch_y_insert_into
+        insert_args = ('nd_experiment', [], self.EXP_COLS)
+        insert_kwargs = {'cursor'  : self.con.cursor()}
+        args = (stmt, join_func, insert_args, insert_kwargs)
+        kwargs = {}
+        t = Task(name, f, *args, **kwargs)
+        return (t,)
+
+    def __t4_link(self, stocks):
+        stmt = '''
+            SELECT {result_columns} FROM (VALUES {values}) v
+                JOIN stock s ON v.column1 = stock.uniquename
+                JOIN stockprop sp ON v.column2
+                JOIN phenotype p ON ?
+                JOIN nd_experiment e ON ?
+                ?
+        ''' #XXX
+        values = None#XXX
+        columns = 's.stock_id,sp.stockprop_id,p.phenotype_id,e.nd_experiment_id'
+        stmt = stmt.format(result_columns=columns, values=values)
+
+        name = 'link all the things'
+        if tname: name = name + '({})'.format(tname)
+        f = self.chado.fetch_y_insert_into
+        return (Task.init_empty(),)
+
+    @staticmethod
+    def link_all():
+        pass
+
+    def create_phenotype(self, stocks, descs, others=[], genus=None,
+                         tname=None):
+        '''
+        Create (possibly multiple) Tasks to upload phenotypic data.
+
+        stocks - list of stock names
+        descs  - list of dict's of phenotypic data
+        others - list of dict's with additional information
+                 e.g.: geolocation(nd_geolocation), date's(stockprop), ..
+        '''
+        # === Plan of Action ===
+        # T1   - create_stockprop from <others>
+        t_stockprop = self.__t1_create_stockprop(others, tname)
+
+        # T1.X - create_X from <others>
+        #
+        # T2   - upload phenotypes from <descs>
+        t_phenos = self.__t2_create_phenoes(stocks, descs, tname)
+
+        # T3   - get geolocation ids        # has already been uploaded..
+        # T3   - create_nd_experiment
+        t_experiment = self.__t3_create_experiments(others, stocks)
+
+        # T4   - get stock ids
+        # T4   - get stockprop ids
+        # T4   - get phenotype ids
+        # T4   - get nd_experiment ids
+        # T4   - link all the things
+        t_link = self.__t4_link(stocks)
+
+        return ([t_stockprop, t_phenos, t_experiment], t_link)
 
 # META-BEGIN
 # Metaprogramming helper-function.

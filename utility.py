@@ -114,6 +114,7 @@ class Task(VerboseQuiet):
         self.args = args
         self.kwargs = kwargs
     def execute(self):
+        '''Calls self.job with given args and kwargs.'''
         msg = '{}.execute()'
         self.vprint(msg.format(self.__str__()[:40]+'...)'))
         self.job(*self.args, **self.kwargs)
@@ -126,4 +127,9 @@ class Task(VerboseQuiet):
         return s
     def __repr__(self):
         return self.__str__()
+
+    @staticmethod
+    def init_empty():
+        '''Does nothing when executed.'''
+        return Task('Empty', lambda args,kwargs: None, [], {})
 

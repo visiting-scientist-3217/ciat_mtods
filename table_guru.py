@@ -392,7 +392,6 @@ class TableGuru(utility.VerboseQuiet):
 
         return tasks
 
-    # TODO use 'pick_date' and 'plant_date'
     def __check_and_add_phenotypes(self):
         '''Creates MCL spreadsheets to upload the phenotyping data.
 
@@ -410,25 +409,13 @@ class TableGuru(utility.VerboseQuiet):
         # stocks needs to be passed as aditional argument
         stocks = [getattr(i, tr_inv['stock.name']) for i in raw_data]
 
-        # === Plan of Action ===
-        # - remove <others>
-        # - create_geolocation
-        # - create_stockprop
-        # - create_cvterm
-
         others = []
         for i in raw_data:
             new = {}
             for k,v in tr_inv.iteritems():
                 if k == 'nd_geolocation.description':
-                    # If this block throws an error one day remember:
-                    #   a description is useless without the coordinates
                     name = getattr(i, tr_inv['nd_geolocation.description'])
-                    alt = getattr(i, tr_inv['nd_geolocation.altitude'])
-                    lat = getattr(i, tr_inv['nd_geolocation.latitude'])
-                    lon = getattr(i, tr_inv['nd_geolocation.longitude'])
-                    location = "{0}_{1}_{2}_{3}".format(name, alt, lat, lon)
-                    new.update({'site_name' : location})
+                    new.update({'site_name' : name})
                 if 'date' in k:
                     d = self.__tostr(getattr(i, v))
                     if 'plant' in k:
@@ -453,13 +440,13 @@ class TableGuru(utility.VerboseQuiet):
             descs.append(new)
         if attr_blacklist:
             msg = '[blacklist:{tab}] Consider fixing these entries in the'\
-                + ' config file or the ontology'\
-                + ' tables:\n\'\'\'\n{blk}\n\'\'\'\n'
+                + ' config file or the ontology tables:\n'\
+                + '\'\'\'\n{blk}\n\'\'\'\n'
             self.qprint(msg.format(tab=self.table, blk=attr_blacklist))
 
         # Check if all phenotypes exist already as cvterm, if not, add 'em.
-        pheno_cvts = [i[1:] for i in descs[0].keys()] # strip the '#'
-        tasks += self.__check_and_add_cvterms(pheno_cvts, f_ext='pre_pheno')
+        pheno_cvts = [i.lstrip('#') for i in descs[0].keys()]
+        t_cvt = self.__check_and_add_cvterms(pheno_cvts, f_ext='pre_pheno')
 
         # Looking in the first ontology mapping and then Chado, to find the
         # genus of Cassava. ('Manihot')
@@ -467,11 +454,8 @@ class TableGuru(utility.VerboseQuiet):
         where = "common_name = '{}'".format(crp)
         genus = self.chado.get_organism(where=where)[0].genus
 
-        fname = os.path.join(self.basedir, 'phenotyping_data.xlsx')
-        self.linker.create_phenotype(fname, self.dataset, stocks, descs,
-                                     other=others, genus=genus)
-        tasks.append(fname)
-        return tasks
+        t_phen = self.linker.create_phenotype(stocks, descs, other=others, genus=genus)
+        return (t_cvt, t_phen)
 
     def __get_trait_name(self, trait):
         '''Using self.onto.mapping, we create and return a nice trait name.

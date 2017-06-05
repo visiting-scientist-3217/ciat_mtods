@@ -44,17 +44,36 @@ class PostgreTests(unittest.TestCase):
         cls.sites = [
                 {'nd_geolocation.description' : 'asdfAA',
                  'nd_geolocation.altitude'    : '1',
-                 'nd_geolocation.latitude'    : '40',
+                 'nd_geolocation.latitude'    : '666N',
+                 'nd_geolocation.longitude'   : ' 73W'},
+                {'nd_geolocation.description' : 'asdfAAr2',
+                 'nd_geolocation.altitude'    : '2',
+                 'nd_geolocation.latitude'    : ' 038',
+                 'nd_geolocation.longitude'   : '87'},
+            ]
+        cls.sites_clean = [ # used for deletion, and tests
+                {'nd_geolocation.description' : 'asdfAA',
+                 'nd_geolocation.altitude'    : '1',
+                 'nd_geolocation.latitude'    : '666',
                  'nd_geolocation.longitude'   : '73'},
                 {'nd_geolocation.description' : 'asdfAAr2',
                  'nd_geolocation.altitude'    : '2',
                  'nd_geolocation.latitude'    : '38',
                  'nd_geolocation.longitude'   : '87'},
             ]
-        cls.phenos = [
-                '',
+        cls.pheno_args = [
+                cls.stocks,
+                [{'some_property' : 777},
+                 {'some_property' : 777}]
             ]
-        cls.props = []
+        cls.pheno_kwargs = {
+                'others' : [{'pick_date': 12, 'plant_date' : 13},
+                            {'pick_date': 21, 'plant_date' : 31}]
+            }
+        cls.props = [
+                [cls.stocks[0], 'Avaluuea',],
+                [cls.stocks[1], 'Bvaluauaeas',],
+            ]
  
     # remove all the things
     @classmethod
@@ -64,7 +83,7 @@ class PostgreTests(unittest.TestCase):
                                           and_dbxref=True)
         for s in cls.stocks:
             ConTest.chadodb.delete_stock(s)
-        for g in cls.sites:
+        for g in cls.sites_clean:
             ConTest.chadodb.delete_geolocation(keys=g)
         for p in cls.phenos:
             ConTest.chadodb.delete_phenotype(p)
@@ -120,23 +139,65 @@ class PostgreTests(unittest.TestCase):
         sts = [i.description for i in ConTest.chadodb.get_nd_geolocation()]
         self.assertIn(self.sites[0]['nd_geolocation.description'], sts, msg)
         self.assertIn(self.sites[1]['nd_geolocation.description'], sts, msg)
+        lats = [i.latitude for i in ConTest.chadodb.get_nd_geolocation()]
+        msg = 'translation of coordinates failed'
+        self.assertIn(float(self.sites_clean[1]['nd_geolocation.latitude']),
+                      lats, msg)
+
+    @staticmethod
+    def print_tasks(ts, pre=''):
+        for t in ts:
+            if type(t) == list:
+                print self.print_tasks(t, pre=pre)
+            elif type(t) == tuple:
+                print self.print_tasks(t, pre=pre+'\t')
+            else:
+                if pre != '': pre = pre + '>'
+                print pre, str(t)[:40]
 
     def test_phenotype_tasks(self):
-        ts = ConTest.linker.create_phenotype(self.phenos)
+        ts = ConTest.linker.create_phenotype(*self.pheno_args,
+                                             **self.pheno_kwargs)
+        self.print_tasks(ts)
         pre_len = len(ConTest.chadodb.get_phenotype())
         for t in ts:
             t.execute()
         post_len = len(ConTest.chadodb.get_phenotype())
-        msg = 'creation of phenotypes failed, expecting at least 3 valid'\
-            + ' traits for the 2 testuploads'
+        msg = 'creation of phenotypes failed'
+        # expecting at least 3 valid traits for the 2 v testuploads
         self.assertGreaterEqual(post_len, pre_len + (2*3), msg)
 
     def test_stockprop_tasks(self):
-        ts = ConTest.linker.create_stockprop(self.props)
+        vals = ','.join("'"+s+"'" for s in self.stocks)
+        where = "uniquename = ANY(ARRAY[{}])".format(vals)
+        stocks = ConTest.chadodb.get_stock(where=where)
+        if not len(stocks) == 2:
+            msg = 'Cannot execute stockprop test, as stock test failed'
+            raise RuntimeError(msg)
+        ts = ConTest.linker.create_stockprop(self.props, 'icontain')
         pre_len = len(ConTest.chadodb.get_stockprop())
         for t in ts:
             t.execute()
         post_len = len(ConTest.chadodb.get_stockprop())
+        msg = 'stockprop creation failed'
+        self.assertEqual(pre_len + 2, post_len, msg)
+        stockprops = ConTest.chadodb.get_stockprop()
+        a = [i for i in stockprops if i.value == self.props[0][1]]
+        b = [i for i in stockprops if i.value == self.props[1][1]]
+        msg = 'stockprop value not found'
+        self.assertTrue(a != [], msg)
+        self.assertTrue(b != [], msg)
+        a = a[0]
+        b = b[0]
+        stocks = ConTest.chadodb.get_stock()
+        a_stock = [i for i in stocks if i.uniquename == self.stocks[0]]
+        b_stock = [i for i in stocks if i.uniquename == self.stocks[1]]
+        a_id = a_stock[0].stock_id
+        b_id = b_stock[0].stock_id
+        msg = 'stockprop ordering failed'
+        self.assertEqual(a.stock_id, a_id, msg)
+        self.assertEqual(b.stock_id, b_id, msg)
+
 
 class OracleTests(unittest.TestCase):
     longMessage = True # Append my msg to default msg.
