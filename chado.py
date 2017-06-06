@@ -22,7 +22,7 @@ CULTIVAR_WIKI='''\
 Germplasm Type: assemblage of plants select for desirable characteristics\
 '''
 
-class ChadoPostgres():
+class ChadoPostgres(object):
     '''You can ask questions about Chado once we have a connection to that
     database.
     
@@ -150,8 +150,8 @@ class ChadoPostgres():
         INSERT-statements. Like this we only construct moderately long
         SELECT-statements.
         '''
-        print '[fetch_y_insert_into] args:', insert_args
-        print '[fetch_y_insert_into] kwargs:', insert_kwargs
+        #print '[fetch_y_insert_into] args:', insert_args
+        #print '[fetch_y_insert_into] kwargs:', insert_kwargs
         if not insert_kwargs.has_key('cursor'):
             raise RuntimeError('need cursor object')
         c = insert_kwargs['cursor']
@@ -211,13 +211,13 @@ class ChadoPostgres():
         cond = cond.format(genus, species)
         self.__delete_where('organism', cond)
 
-    def delete_cvterm(self, name, cv, and_dbxref=False):
+    def delete_cvterm(self, name, cv=None, and_dbxref=False):
         '''Deletes all cvterms, with given name and cv.'''
-        cvs = self.get_cv(where="name = '{}'".format(cv))
-        if not len(cvs) == 1:
-            raise Warning('Ambiguous cvterm deletetion.')
-        cv_id = cvs[0].cv_id
-        cond = "name = '{0}' and cv_id = {1}".format(name, cv_id)
+        cond = "name = '{0}'".format(name)
+        if cv:
+            cvs = self.get_cv(where="name = '{}'".format(cv))
+            cv_id = cvs[0].cv_id
+            cond = cond + " AND cv_id = {1}".format(name, cv_id)
         if and_dbxref:
             cvts = self.get_cvterm(where=cond)
         self.__delete_where('cvterm', cond)
@@ -238,14 +238,79 @@ class ChadoPostgres():
         else: 
             cond = '1=1'
         if keys:
+            # we strip this prefix, because it comes like this from the Config
             ndg = 'nd_geolocation.'
             for k,v in keys.iteritems():
                 if k.startswith(ndg): k = k.split(ndg)[1]
                 cond = cond + " and {col} = '{val}'".format(col=k, val=v)
         self.__delete_where('nd_geolocation', cond)
 
-    def delete_phenotype(self, pheno):
-        pass
+    def delete_stockprop(self, val=None, type=None, keyval=None, keyvals=None,
+                         del_attr=False):
+        '''Deletes all stockprops, with given value/type, or both.
+        
+        If the stockprop to delete does not exist, we return silently.
+        If <val> or <type> is given <keyval[s]> are ignored.
+        if <del_attr> is True, we also delete the type of the stockprop
+        (the cvterm).
+            keyval = {a:b}
+            keyvals = [{a:b}, {c:d}, ..]
+        '''
+        if val and type:
+            keyvals = [{type : val}]
+        elif val or type:
+            if val:
+                cond = "value = '{}'".format(val)
+            else:
+                t = self.get_cvterm(where="name = '{}'".format(type))
+                if not t: return
+                cond = "type_id = {}".format(t[0].cvterm_id)
+            return self.__delete_where('stockprop', cond)
+        if keyval:
+            keyvals = [keyval]
+
+        conds = []
+        if del_attr:
+            to_del = set()
+        for kv in keyvals:
+            for k,v in kv.iteritems():
+                t = self.get_cvterm(where="name = '{}'".format(k))
+                if not t: return
+                cond = "(type_id = {}".format(t[0].cvterm_id)
+                cond = cond + " AND value = '{}')".format(v)
+                conds.append(cond)
+                if del_attr:
+                    to_del.update({k})
+        if del_attr:
+            for i in to_del:
+                self.delete_cvterm(i)
+
+        cond = ' OR '.join(conds)
+        self.__delete_where('stockprop', cond)
+
+    def delete_phenotype(self, keyval=None, keyvals=None, del_attr=False):
+        '''Deletes all phenotypes, with given descriptors/values.
+        
+        if <del_attr> is True, we also delete the type of the phenotype (the
+        cvterm).
+            keyval = {a:b}
+            keyvals = [{a:b}, {c:d}, ..]
+        '''
+        if keyval:
+            if keyvals:
+                keyvals.append(keyval)
+            else:
+                keyvals = [keyval]
+        conds = []
+        for kv in keyvals:
+            k,v = next(kv.iteritems())
+            t = self.get_cvterm(where="name = '{}'".format(k))
+            if not t: return
+            cond = "(attr_id = {}".format(t[0].cvterm_id)
+            cond = cond + " AND value = '{}')".format(v)
+            conds.append(cond)
+        cond = ' OR '.join(conds)
+        self.__delete_where('phenotype', cond)
 
 class ChadoDataLinker(object):
     '''Links large list()s of data, ready for upload into Chado.
@@ -264,6 +329,7 @@ class ChadoDataLinker(object):
     EXP_COLS        = ['nd_geolocation_id', 'type_id']
 
     # implemented stockprop's which might occur in the phenotyping metadata
+    # TODO put this in the config file!
     STOCKPROPS = ('pick_date', 'plant_date')
 
     def __init__(self, chado, dbname, cvname):
@@ -288,12 +354,15 @@ class ChadoDataLinker(object):
         needed_dbxrefs = [a for a in accession if not a in curr_dbxrefs]
 
         content = [[db_id, a] for a in needed_dbxrefs]
-        name = 'dbxref upload'
-        if tname: name = name + '({})'.format(tname)
-        f = self.chado.insert_into
-        args = ('dbxref', content, self.DBXREF_COLS)
-        kwargs = {'cursor' : self.con.cursor()} # new cursor() for every Task
-        t1_dbxref = Task(name, f, *args, **kwargs)
+        if content:
+            name = 'dbxref upload'
+            if tname: name = name + '({})'.format(tname)
+            f = self.chado.insert_into
+            args = ('dbxref', content, self.DBXREF_COLS)
+            kwargs = {'cursor' : self.con.cursor()} # new cursor() for every Task
+            t1_dbxref = Task(name, f, *args, **kwargs)
+        else:
+            t1_dbxref = Task.init_empty()
 
         # Note: Scary code. We don't know dbxref_id's but still want to use
         # the copy_from upload, or at least an execute query that uploads all
@@ -302,13 +371,12 @@ class ChadoDataLinker(object):
         # cvterm names will be added later to <content> in order to ensure
         # correct ordering, because we don't know the dbxref_id yet
         if definition:
-            it = zip(cvterm, definition)
-            content = [[cv_id, de] for c,de in it] 
+            content = [[cv_id, de] for c,de in zip(cvterm, definition)] 
         else:
             content = [[cv_id, ''] for c in cvterm]
         fstmt = '''\
             SELECT accession,dbxref_id
-                FROM dbxref JOIN (VALUES {}) v ON v.column1 = dbxref.accession
+                FROM dbxref JOIN (VALUES {}) AS v ON v.column1 = dbxref.accession
         '''
         fstmt = fstmt.format(','.join("('{}')".format(v) for v in cvterm))
         def join_func(x, y):
@@ -316,7 +384,7 @@ class ChadoDataLinker(object):
 
         name = 'cvterm upload'
         if tname: name = name + '({})'.format(tname)
-        f = self.chado.fetch_y_insert_into # XXX add fetch..
+        f = self.chado.fetch_y_insert_into
         insert_args = ['cvterm', content, self.CVTERM_COLS]
         insert_kwargs = {'cursor' : self.con.cursor()}
         args = [fstmt, join_func]
@@ -326,13 +394,16 @@ class ChadoDataLinker(object):
         t2_cvt = Task(name, f, *args, **kwargs)
         return (t1_dbxref, t2_cvt) # tuple = enforce sequencial execution
 
-    def __get_or_create_cvterm(self, term):
+    def __get_or_create_cvterm(self, term, acs=None):
         '''Returns the cvterm named <term>, if it does not exist, we create it
         first.
         '''
-        ts = self.create_cvterm([term], accession=[acs], tname='__get_or_create')
-        for t in ts: t.execute()
-        cvterm = self.chado.get_cvterm(where='name = {}'.format(term))[0]
+        if not acs: acs = term
+        cvterm = self.chado.get_cvterm(where="name = '{}'".format(term))
+        if not cvterm:
+            ts = self.create_cvterm([term], accession=[acs], tname='__get_or_create')
+            for t in ts: t.execute()
+        cvterm = self.chado.get_cvterm(where="name = '{}'".format(term))[0]
         if not cvterm: raise RuntimeError('cvterm creation failed!')
         return cvterm
 
@@ -409,14 +480,18 @@ class ChadoDataLinker(object):
             type_id = self.chado.get_cvterm(where=where)[0].cvterm_id
 
         # get stock_ids joined with the values
-        sql = "SELECT stock_id,uniquename FROM stock WHERE uniquename = {}"
-        vals = ','.join("'{}'".format(p[0]) for p in props)
-        where = 'ANY(ARRAY[{}])'.format(vals)
+        sql = '''
+            SELECT s.stock_id,s.uniquename FROM (VALUES {}) AS v
+                JOIN stock s ON s.uniquename = v.column1
+        '''
+        where = ','.join("('{}')".format(p[0]) for p in props)
         sql = sql.format(where)
         self.chado.c.execute(sql)
         stocks = sorted(self.chado.c.fetchall(), key=lambda x: x[1])
         props = sorted(props, key=lambda x: x[0])
         if not len(stocks) == len(props):
+            print 'sss', stocks
+            print 'ppp', props
             raise RuntimeError('unequal stocks/stockprops, unlikely')
         join = zip(stocks, props)
         content = [[sck[0],type_id,prp[1]] for sck,prp in join]
@@ -429,11 +504,22 @@ class ChadoDataLinker(object):
         t = Task(name, f, *args, **kwargs)
         return (t,)
 
-    def __t1_create_stockprop(self, other, tname):
+    def __t1_create_stockprop(self, stocks, others, tname):
         t_stockprop = [Task.init_empty()]
+
+        # -- arg.. FIXME? this is only a problem for the unittests..
+        # because the spreadsheets wanted state, we went with it, and now that
+        # bites us in the ..
+        curr_stocks = self.chado.get_stock()
+        curr_stock_names = [i.name for i in curr_stocks]
+        stocks = [i for i in stocks if i in curr_stock_names]
+        if not stocks:
+            return Task.init_empty()
+        # -- arg..
+
         for stockprop in self.STOCKPROPS:
-            if other[0].has_key(stockprop):
-                props = [i[stockprop] for i in other]
+            if others[0].has_key(stockprop):
+                props = [[s, o[stockprop]] for s,o in zip(stocks,others)]
                 t = self.create_stockprop(props, stockprop, tname=stockprop)
                 t_stockprop.append(t)
         return t_stockprop
@@ -442,24 +528,25 @@ class ChadoDataLinker(object):
         s = '{0}_{1}_{2}'
         return s.format(i,v,randint(1024,1048576))
 
-    def __t2_create_phenoes(self, stocks, descs, tname):
-        t_phenos = [Task.init_empty()] # all in parallel!
-        for descriptor in descs.keys():
-            content = []
-            name = 'phenotype upload'
-            if tname: name = name + '({})'.format(tname)
-            name = name + '({})'.format(descriptor)
-            attr_id = self.__get_or_create_cvterm(descriptor).attr_id
-            values = [i[descriptor] for i in descs]
-            uniqs = [self.__construct_rnd(attr_id, i) for i in values] # TODO rly unique?
-            content = [[n, attr_id, v] for n, v in zip(uniqs, values)]
-            args = ('phenotype', content, self.PHENO_COLS)
-            kwargs = {'cursor' : self.con.cursor()}
-            if tname: name = name + '({})'.format(tname)
-            t_phenos.append(Task(name, f, *args, **kwargs))
-        return t_phenos
+    def __t2_create_phenoes(self, stocks, descs, tname=None):
+        content = []
+        attr_ids = {}
+        for d,s in zip(descs, stocks):
+            for descriptor, value in d.iteritems():
+                if not attr_ids.has_key(descriptor):
+                    new = self.__get_or_create_cvterm(descriptor).cvterm_id
+                    attr_ids.update({descriptor : new})
+                attr_id = attr_ids[descriptor]
+                uniq = self.__construct_rnd(attr_id, value)# TODO rly unique?
+                content.append([uniq, attr_id, value])
+        name = 'phenotype upload'
+        if tname: name = name + '({})'.format(tname)
+        f = self.chado.insert_into
+        args = ('phenotype', content, self.PHENO_COLS)
+        kwargs = {'cursor' : self.con.cursor()}
+        return Task(name, f, *args, **kwargs)
 
-    def __t3_create_experiments(self, others, stocks):
+    def __t3_create_experiments(self, others, stocks, tname=None):
         gs = []
         for i in others:
             if hasattr(i, 'site_name'):
@@ -469,7 +556,7 @@ class ChadoDataLinker(object):
             gs.append(n)
         geo_n_stock = ["('{0}','{1}')".format(i,j) for i,j in zip(gs,stocks)]
         stmt = '''
-            SELECT g.nd_geolocation_id,s.stock_id FROM (VALUES {}) v
+            SELECT g.nd_geolocation_id,s.stock_id FROM (VALUES {}) AS v
                 JOIN nd_geolocation g ON v.column1 = g.description
                 JOIN stock s ON v.column2 = stock.uniquename
         '''
@@ -481,17 +568,19 @@ class ChadoDataLinker(object):
         name = 'cvterm upload'
         if tname: name = name + '({})'.format(tname)
         f = self.chado.fetch_y_insert_into
-        insert_args = ('nd_experiment', [], self.EXP_COLS)
+        insert_args = ['nd_experiment', [], self.EXP_COLS]
         insert_kwargs = {'cursor'  : self.con.cursor()}
-        args = (stmt, join_func, insert_args, insert_kwargs)
+        args = [stmt, join_func]
+        args += insert_args
         kwargs = {}
+        kwargs.update(insert_kwargs)
         t = Task(name, f, *args, **kwargs)
         return (t,)
 
-    def __t4_link(self, stocks):
+    def __t4_link(self, stocks, tname=None):
         stmt = '''
-            SELECT {result_columns} FROM (VALUES {values}) v
-                JOIN stock s ON v.column1 = stock.uniquename
+            SELECT {result_columns} FROM (VALUES {values}) AS v
+                JOIN stock s ON v.column1 = s.uniquename
                 JOIN stockprop sp ON v.column2
                 JOIN phenotype p ON ?
                 JOIN nd_experiment e ON ?
@@ -510,6 +599,8 @@ class ChadoDataLinker(object):
     def link_all():
         pass
 
+    # FIXME: missleading name, does so much more than just create phenotypeing
+    #        entries..
     def create_phenotype(self, stocks, descs, others=[], genus=None,
                          tname=None):
         '''
@@ -522,7 +613,7 @@ class ChadoDataLinker(object):
         '''
         # === Plan of Action ===
         # T1   - create_stockprop from <others>
-        t_stockprop = self.__t1_create_stockprop(others, tname)
+        t_stockprop = self.__t1_create_stockprop(stocks, others, tname)
 
         # T1.X - create_X from <others>
         #

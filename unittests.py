@@ -9,6 +9,7 @@ import cassava_ontology
 import getpass
 import migration
 import table_guru
+import utility
 
 PATH='testpath'
 
@@ -55,7 +56,7 @@ class PostgreTests(unittest.TestCase):
                 {'nd_geolocation.description' : 'asdfAA',
                  'nd_geolocation.altitude'    : '1',
                  'nd_geolocation.latitude'    : '666',
-                 'nd_geolocation.longitude'   : '73'},
+                 'nd_geolocation.longitude'   : '-73'},
                 {'nd_geolocation.description' : 'asdfAAr2',
                  'nd_geolocation.altitude'    : '2',
                  'nd_geolocation.latitude'    : '38',
@@ -74,10 +75,15 @@ class PostgreTests(unittest.TestCase):
                 [cls.stocks[0], 'Avaluuea',],
                 [cls.stocks[1], 'Bvaluauaeas',],
             ]
+        cls.props_type = 'icontain'
  
     # remove all the things
+    # sadly we cannot: ConTest.chadodb.con.rollback()
     @classmethod
     def tearDownClass(cls):
+        # get a new cursor in case something went wrong
+        ConTest.chadodb.con.commit()
+        ConTest.chadodb.c = ConTest.chadodb.con.cursor()
         for c in cls.cvts:
             ConTest.chadodb.delete_cvterm(c, cv=ConTest.linker.cv,
                                           and_dbxref=True)
@@ -85,8 +91,12 @@ class PostgreTests(unittest.TestCase):
             ConTest.chadodb.delete_stock(s)
         for g in cls.sites_clean:
             ConTest.chadodb.delete_geolocation(keys=g)
-        for p in cls.phenos:
-            ConTest.chadodb.delete_phenotype(p)
+        for sps in cls.props:
+            ConTest.chadodb.delete_stockprop(val=sps[1], type=cls.props_type)
+        for p in cls.pheno_args[1]:
+            ConTest.chadodb.delete_phenotype(keyval=p, del_attr=True)
+        for spp in cls.pheno_kwargs['others']:
+            ConTest.chadodb.delete_stockprop(keyval=spp)
 
     def test_organism_funcs(self):
         genus = 'test_genus'
@@ -144,29 +154,6 @@ class PostgreTests(unittest.TestCase):
         self.assertIn(float(self.sites_clean[1]['nd_geolocation.latitude']),
                       lats, msg)
 
-    @staticmethod
-    def print_tasks(ts, pre=''):
-        for t in ts:
-            if type(t) == list:
-                print self.print_tasks(t, pre=pre)
-            elif type(t) == tuple:
-                print self.print_tasks(t, pre=pre+'\t')
-            else:
-                if pre != '': pre = pre + '>'
-                print pre, str(t)[:40]
-
-    def test_phenotype_tasks(self):
-        ts = ConTest.linker.create_phenotype(*self.pheno_args,
-                                             **self.pheno_kwargs)
-        self.print_tasks(ts)
-        pre_len = len(ConTest.chadodb.get_phenotype())
-        for t in ts:
-            t.execute()
-        post_len = len(ConTest.chadodb.get_phenotype())
-        msg = 'creation of phenotypes failed'
-        # expecting at least 3 valid traits for the 2 v testuploads
-        self.assertGreaterEqual(post_len, pre_len + (2*3), msg)
-
     def test_stockprop_tasks(self):
         vals = ','.join("'"+s+"'" for s in self.stocks)
         where = "uniquename = ANY(ARRAY[{}])".format(vals)
@@ -174,7 +161,7 @@ class PostgreTests(unittest.TestCase):
         if not len(stocks) == 2:
             msg = 'Cannot execute stockprop test, as stock test failed'
             raise RuntimeError(msg)
-        ts = ConTest.linker.create_stockprop(self.props, 'icontain')
+        ts = ConTest.linker.create_stockprop(self.props, self.props_type)
         pre_len = len(ConTest.chadodb.get_stockprop())
         for t in ts:
             t.execute()
@@ -197,6 +184,31 @@ class PostgreTests(unittest.TestCase):
         msg = 'stockprop ordering failed'
         self.assertEqual(a.stock_id, a_id, msg)
         self.assertEqual(b.stock_id, b_id, msg)
+
+    @staticmethod
+    def print_tasks(ts, pre=''):
+        if type(ts) == list:
+            for t in ts:
+                print PostgreTests.print_tasks(t, pre=pre)
+        elif type(ts) == tuple:
+            for t in ts:
+                print PostgreTests.print_tasks(t, pre=pre+'\t')
+        else:
+            if pre != '': pre = pre + '>'
+            print pre, str(ts)[:50]+'...'
+
+    def test_phenotype_tasks(self):
+        ts = ConTest.linker.create_phenotype(*self.pheno_args,
+                                             **self.pheno_kwargs)
+        print '\n=== Tasks Start ==='
+        self.print_tasks(ts)
+        print '\n=== Tasks End ===\n'
+        pre_len = len(ConTest.chadodb.get_phenotype())
+        utility.Task.non_parallel_upload(ts)
+        post_len = len(ConTest.chadodb.get_phenotype())
+        msg = 'creation of phenotypes failed'
+        # expecting at least 3 valid traits for the 2 v testuploads
+        self.assertGreaterEqual(post_len, pre_len + (2*3), msg)
 
 
 class OracleTests(unittest.TestCase):

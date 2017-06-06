@@ -86,37 +86,39 @@ class VerboseQuiet(object):
         self.printlock = threading.Lock()
         self.VERBOSE = False
         self.QUIET = False
-    def vprint(self, s):
-        '''Only print stuff, if we are in verbose mode.'''
+    def __acq(self):
         if hasattr(self, 'printlock'):
             self.printlock.acquire()
-        if self.VERBOSE:
-            print s
+    def __rel(self):
         if hasattr(self, 'printlock'):
             self.printlock.release()
+    def vprint(self, s):
+        '''Only print stuff, if we are in verbose mode.'''
+        if self.VERBOSE:
+            self.__acq()
+            print s
+            self.__rel()
 
     def qprint(self, s):
         '''Only print stuff, if we are NOT in quiet mode.'''
-        if hasattr(self, 'printlock'):
-            self.printlock.acquire()
         if not self.QUIET:
+            self.__acq()
             print s
-        if hasattr(self, 'printlock'):
-            self.printlock.release()
+            self.__rel()
 
 class Task(VerboseQuiet):
     '''Used for multithreading implementation.'''
     def __init__(self, name, job, *args, **kwargs):
         super(self.__class__, self).__init__()
-        #self.VERBOSE = True
+        self.VERBOSE = True
         self.name = name
         self.job = job
         self.args = args
         self.kwargs = kwargs
     def execute(self):
         '''Calls self.job with given args and kwargs.'''
-        msg = '{}.execute()'
-        self.vprint(msg.format(self.__str__()[:40]+'...)'))
+        msg = '\n\t{}.execute()'
+        self.vprint(msg.format(self.__str__()[:50]+'...)'))
         self.job(*self.args, **self.kwargs)
     def __str__(self):
         s = 'Task(name={name}, job={job}, default_args={dargs},'\
@@ -132,4 +134,13 @@ class Task(VerboseQuiet):
     def init_empty():
         '''Does nothing when executed.'''
         return Task('Empty', lambda args,kwargs: None, [], {})
+
+    @staticmethod
+    def non_parallel_upload(tasks):
+        '''Non parallel upload for testing purposes.'''
+        if not type(tasks) == Task:
+            for t in tasks:
+                Task.non_parallel_upload(t)
+        else:
+            tasks.execute()
 
