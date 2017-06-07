@@ -64,8 +64,8 @@ class PostgreTests(unittest.TestCase):
             ]
         cls.pheno_args = [
                 cls.stocks,
-                [{'some_property' : 777},
-                 {'some_property' : 777}]
+                [{'some_property' : 777134, 'another_prop' : 'ok well done'},
+                 {'some_property' : 777134}]
             ]
         cls.pheno_kwargs = {
                 'others' : [{'pick_date': 12, 'plant_date' : 13},
@@ -108,7 +108,8 @@ class PostgreTests(unittest.TestCase):
         self.assertFalse(ConTest.chadodb.has_species(species))
         self.assertFalse(ConTest.chadodb.has_genus(genus))
 
-    def test_cvterm_tasks(self):
+    #def test_cvterm_tasks(self):
+    def test_all_tasks_cuz_spreadsheets_wanted_state(self):
         ts = ConTest.linker.create_cvterm(self.cvts)
         pre_len = len(ConTest.chadodb.get_cvterm())
         for t in ts:
@@ -124,7 +125,7 @@ class PostgreTests(unittest.TestCase):
         self.assertIn(self.cvts[0], dbxrefs, msg)
         self.assertIn(self.cvts[1], dbxrefs, msg)
 
-    def test_stock_tasks(self):
+    #def test_stock_tasks(self):
         organism = ConTest.chadodb.get_organism()[0]
         ts = ConTest.linker.create_stock(self.stocks, organism)
 
@@ -138,7 +139,7 @@ class PostgreTests(unittest.TestCase):
         self.assertIn(self.stocks[0], stocks, msg)
         self.assertIn(self.stocks[1], stocks, msg)
 
-    def test_geolocation_tasks(self):
+    #def test_geolocation_tasks(self):
         ts = ConTest.linker.create_geolocation(self.sites)
         pre_len = len(ConTest.chadodb.get_nd_geolocation())
         for t in ts:
@@ -154,7 +155,7 @@ class PostgreTests(unittest.TestCase):
         self.assertIn(float(self.sites_clean[1]['nd_geolocation.latitude']),
                       lats, msg)
 
-    def test_stockprop_tasks(self):
+    #def test_stockprop_tasks(self):
         vals = ','.join("'"+s+"'" for s in self.stocks)
         where = "uniquename = ANY(ARRAY[{}])".format(vals)
         stocks = ConTest.chadodb.get_stock(where=where)
@@ -185,30 +186,39 @@ class PostgreTests(unittest.TestCase):
         self.assertEqual(a.stock_id, a_id, msg)
         self.assertEqual(b.stock_id, b_id, msg)
 
-    @staticmethod
-    def print_tasks(ts, pre=''):
-        if type(ts) == list:
-            for t in ts:
-                print PostgreTests.print_tasks(t, pre=pre)
-        elif type(ts) == tuple:
-            for t in ts:
-                print PostgreTests.print_tasks(t, pre=pre+'\t')
-        else:
-            if pre != '': pre = pre + '>'
-            print pre, str(ts)[:50]+'...'
-
-    def test_phenotype_tasks(self):
+    #def test_phenotype_tasks(self):
         ts = ConTest.linker.create_phenotype(*self.pheno_args,
                                              **self.pheno_kwargs)
         print '\n=== Tasks Start ==='
-        self.print_tasks(ts)
-        print '\n=== Tasks End ===\n'
+        utility.Task.print_tasks(ts)
+        print '=== Tasks End ==='
         pre_len = len(ConTest.chadodb.get_phenotype())
         utility.Task.non_parallel_upload(ts)
         post_len = len(ConTest.chadodb.get_phenotype())
         msg = 'creation of phenotypes failed'
-        # expecting at least 3 valid traits for the 2 v testuploads
-        self.assertGreaterEqual(post_len, pre_len + (2*3), msg)
+        self.assertGreaterEqual(post_len, pre_len + 3, msg)
+        
+        # check if we linked all the things correctly
+        sql = '''
+            SELECT p.value,s.uniquename FROM nd_experiment AS e
+                JOIN nd_experiment_stock es
+                    ON e.nd_experiment_id = es.nd_experiment_id
+                JOIN nd_experiment_phenotype ep
+                    ON e.nd_experiment_id = ep.nd_experiment_id
+                JOIN phenotype p
+                    ON p.phenotype_id = ep.phenotype_id
+                JOIN stock s
+                    ON s.stock_id = es.stock_id
+        '''
+        ConTest.chadodb.c.execute(sql)
+        r = ConTest.chadodb.c.fetchall()
+        phenoes = [i[0] for i in r]
+        stocks = [i[1] for i in r]
+        self.assertIn(self.stocks[0], stocks)
+        self.assertIn(self.stocks[1], stocks)
+        for ps in self.pheno_args[1]:
+            for v in ps.values():
+                self.assertIn(str(v), phenoes)
 
 
 class OracleTests(unittest.TestCase):

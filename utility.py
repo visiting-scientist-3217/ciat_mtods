@@ -110,15 +110,15 @@ class Task(VerboseQuiet):
     '''Used for multithreading implementation.'''
     def __init__(self, name, job, *args, **kwargs):
         super(self.__class__, self).__init__()
-        self.VERBOSE = True
+        #self.VERBOSE = True
         self.name = name
         self.job = job
         self.args = args
         self.kwargs = kwargs
     def execute(self):
         '''Calls self.job with given args and kwargs.'''
-        msg = '\n\t{}.execute()'
-        self.vprint(msg.format(self.__str__()[:50]+'...)'))
+        msg = '\n[exec] {}'
+        self.vprint(msg.format(self.__str__()[:70]+'...)'))
         self.job(*self.args, **self.kwargs)
     def __str__(self):
         s = 'Task(name={name}, job={job}, default_args={dargs},'\
@@ -144,3 +144,15 @@ class Task(VerboseQuiet):
         else:
             tasks.execute()
 
+    @staticmethod
+    def print_tasks(ts, pre=''):
+        '''One level of indentation equals parallel execution.'''
+        if type(ts) == list:
+            for t in ts:
+                Task.print_tasks(t, pre=pre)
+        elif type(ts) == tuple:
+            for t in ts:
+                Task.print_tasks(t, pre=pre+'\t')
+        else:
+            if pre != '': pre = pre + '>'
+            print pre, str(ts)[:50]+'...'

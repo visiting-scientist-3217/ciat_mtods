@@ -39,7 +39,8 @@ class ChadoPostgres(object):
     <where> used as where statement. If <where> is empty all rows are returned.
         .get_{table}(where='')
             , with {table} element [self.COMMON_TABLES, 'organism',
-                                    'nd_geolocation', 'dbxref', 'stockprop']
+                                    'nd_geolocation', 'nd_experiment',
+                                    'dbxref', 'stockprop']
     '''
     COMMON_TABLES = ['db', 'cv', 'cvterm', 'genotype', 'phenotype', 'project',
                      'stock', 'study']
@@ -128,9 +129,7 @@ class ChadoPostgres(object):
             raise RuntimeError(msg)
         if not cursor:
             raise RuntimeError('need cursor object')
-        sql = PSQLQ.insert_into_table
         f = StringIO('\n'.join('\t'.join(str(v) for v in vs) for vs in values))
-        #columns = '('+','.join(columns)+')'
         cursor.copy_from(f, table, columns=columns)
 
     @staticmethod
@@ -150,15 +149,15 @@ class ChadoPostgres(object):
         INSERT-statements. Like this we only construct moderately long
         SELECT-statements.
         '''
-        #print '[fetch_y_insert_into] args:', insert_args
-        #print '[fetch_y_insert_into] kwargs:', insert_kwargs
         if not insert_kwargs.has_key('cursor'):
             raise RuntimeError('need cursor object')
+
         c = insert_kwargs['cursor']
         c.execute(fetch_stmt)
         fetch_res = c.fetchall()
-        # replaces values with the constructed join'ed ones
+
         args = list(insert_args)
+        # replaces values with the constructed join'ed ones
         args[1] = values_constructor(insert_args[1], fetch_res)
         ChadoPostgres.insert_into(*args, **insert_kwargs)
 
@@ -192,10 +191,7 @@ class ChadoPostgres(object):
         values = values.format(abr=abbreviation, gen=genus, spec=species,
             com_n=common_name, com=comment)
         sql = sql.format(table=table, columns=columns, values=values)
-
         self.c.execute(sql)
-        if not self.con.autocommit:
-            self.con.commit()
 
     def __delete_where(self, table, condition):
         '''DELETE FROM <table> WHERE <condition>'''
@@ -327,6 +323,8 @@ class ChadoDataLinker(object):
     GEOLOC_COLS     = ['description', 'latitude', 'longitude', 'altitude']
     PHENO_COLS      = ['uniquename', 'attr_id', 'value'] # not const
     EXP_COLS        = ['nd_geolocation_id', 'type_id']
+    EXP_STOCK_COLS  = ['nd_experiment_id', 'stock_id', 'type_id']
+    EXP_PHENO_COLS  = ['nd_experiment_id', 'phenotype_id']
 
     # implemented stockprop's which might occur in the phenotyping metadata
     # TODO put this in the config file!
@@ -399,23 +397,17 @@ class ChadoDataLinker(object):
         first.
         '''
         if not acs: acs = term
-        cvterm = self.chado.get_cvterm(where="name = '{}'".format(term))
-        if not cvterm:
+        try:
+            cvterm = self.chado.get_cvterm(where="name = '{}'".format(term))[0]
+        except IndexError:
             ts = self.create_cvterm([term], accession=[acs], tname='__get_or_create')
             for t in ts: t.execute()
-        cvterm = self.chado.get_cvterm(where="name = '{}'".format(term))[0]
-        if not cvterm: raise RuntimeError('cvterm creation failed!')
+            cvterm = self.chado.get_cvterm(where="name = '{}'".format(term))[0]
         return cvterm
 
     def create_stock(self, stocks, organism, tname=None, germplasm_t='cultivar'):
         '''Create (possibly multiple) Tasks to upload stocks.'''
-        where = 'name = \'{}\''.format(germplasm_t)
-        cvt = self.chado.get_cvterm(where=where)[0]
-        if not cvt:
-            for t in self.create_cvterm([germplasm_t],
-                                        definition=[CULTIVAR_WIKI]):
-                t.execute()
-            cvt = self.chado.get_cvterm(where=where)[0]
+        cvt = self.__get_or_create_cvterm(germplasm_t)
         type_id = cvt.cvterm_id
         o_id = organism.organism_id
         content = [[o_id, s, s, type_id] for s in stocks]
@@ -426,7 +418,7 @@ class ChadoDataLinker(object):
         args = ('stock', content, self.STOCK_COLS)
         kwargs = {'cursor' : self.con.cursor()}
         t = Task(name, f, *args, **kwargs)
-        return (t,)
+        return [t,]
 
     def __check_coords(self, ignore_me, lat, lon, alt):
         ''''''
@@ -460,7 +452,7 @@ class ChadoDataLinker(object):
         kwargs = {'cursor' : self.con.cursor()}
         f = self.chado.insert_into
         t = Task(name, f, *args, **kwargs)
-        return (t,)
+        return [t,]
 
     def create_stockprop(self, props, ptype='', tname=None):
         '''Create (possibly multiple) Tasks to upload stocks.
@@ -502,7 +494,7 @@ class ChadoDataLinker(object):
         args = ('stockprop', content, self.STOCKPROP_COLS)
         kwargs = {'cursor' : self.con.cursor()}
         t = Task(name, f, *args, **kwargs)
-        return (t,)
+        return [t,]
 
     def __t1_create_stockprop(self, stocks, others, tname):
         t_stockprop = [Task.init_empty()]
@@ -537,7 +529,10 @@ class ChadoDataLinker(object):
                     new = self.__get_or_create_cvterm(descriptor).cvterm_id
                     attr_ids.update({descriptor : new})
                 attr_id = attr_ids[descriptor]
-                uniq = self.__construct_rnd(attr_id, value)# TODO rly unique?
+                # XXX is <uniq> unique enough?
+                uniq = self.__construct_rnd(attr_id, value)
+                # we need to query these later to obtain the phenotype_id
+                self.pheno_uniquenames.append(uniq)
                 content.append([uniq, attr_id, value])
         name = 'phenotype upload'
         if tname: name = name + '({})'.format(tname)
@@ -546,7 +541,7 @@ class ChadoDataLinker(object):
         kwargs = {'cursor' : self.con.cursor()}
         return Task(name, f, *args, **kwargs)
 
-    def __t3_create_experiments(self, others, stocks, tname=None):
+    def __get_geo_names(self, others):
         gs = []
         for i in others:
             if hasattr(i, 'site_name'):
@@ -554,52 +549,87 @@ class ChadoDataLinker(object):
             else:
                 n = 'Not Available'
             gs.append(n)
-        geo_n_stock = ["('{0}','{1}')".format(i,j) for i,j in zip(gs,stocks)]
+        return gs
+
+    def __t3_create_experiments(self, others, stocks, tname=None):
+        gs = self.__get_geo_names(others)
+        geos = ["('{}')".format(s) for s in gs]
         stmt = '''
-            SELECT g.nd_geolocation_id,s.stock_id FROM (VALUES {}) AS v
+            SELECT g.nd_geolocation_id FROM (VALUES {}) AS v
                 JOIN nd_geolocation g ON v.column1 = g.description
-                JOIN stock s ON v.column2 = stock.uniquename
         '''
-        stmt = stmt.format(','.join(geo_n_stock))
+        stmt = stmt.format(','.join(geos))
+        def join_func(type_id, stmt_res):
+            return map(lambda x: [x[0], type_id], stmt_res)
+            # [type_id, geolocation_id]
+        type_id = self.__get_or_create_cvterm('phenotyping').cvterm_id
 
-        def join_func(_, stmt_res):
-            return stmt_res # geolocation_id,stock_id
-
-        name = 'cvterm upload'
+        name = 'nd_experiment upload'
         if tname: name = name + '({})'.format(tname)
         f = self.chado.fetch_y_insert_into
-        insert_args = ['nd_experiment', [], self.EXP_COLS]
+        insert_args = ['nd_experiment', type_id, self.EXP_COLS]
         insert_kwargs = {'cursor'  : self.con.cursor()}
         args = [stmt, join_func]
         args += insert_args
         kwargs = {}
         kwargs.update(insert_kwargs)
         t = Task(name, f, *args, **kwargs)
-        return (t,)
+        return [t,]
 
-    def __t4_link(self, stocks, tname=None):
+    def __t4_link(self, others, stocks, tname=None):
+        linkers = []
+
         stmt = '''
-            SELECT {result_columns} FROM (VALUES {values}) AS v
-                JOIN stock s ON v.column1 = s.uniquename
-                JOIN stockprop sp ON v.column2
-                JOIN phenotype p ON ?
-                JOIN nd_experiment e ON ?
-                ?
-        ''' #XXX
-        values = None#XXX
-        columns = 's.stock_id,sp.stockprop_id,p.phenotype_id,e.nd_experiment_id'
-        stmt = stmt.format(result_columns=columns, values=values)
+            SELECT e.nd_experiment_id,j.{result} FROM (VALUES {values}) AS v
+                JOIN {join} j ON v.column1 = j.{join_col}
+                JOIN nd_geolocation g ON v.column2 = g.description
+                JOIN nd_experiment e ON g.nd_geolocation_id = e.nd_geolocation_id
+        '''
+        geos = self.__get_geo_names(others)
 
-        name = 'link all the things'
+        # -- stocks --
+        values = ','.join("('{}', '{}')".format(s, g) for s,g in zip(stocks,geos))
+        stock_stmt = stmt.format(result='stock_id', values=values,
+                                 join='stock', join_col='uniquename')
+        cvt = self.__get_or_create_cvterm('sample')
+        type_id = cvt.cvterm_id
+        def join_stock_func(type_id,stmt_res):
+            return map(lambda x: [x[0], x[1], type_id], stmt_res)
+            # [nd_experiment_id, stock_id, type_id]
+
+        name = 'link stocks'
         if tname: name = name + '({})'.format(tname)
         f = self.chado.fetch_y_insert_into
-        return (Task.init_empty(),)
+        insert_args = ['nd_experiment_stock', type_id, self.EXP_STOCK_COLS]
+        insert_kwargs = {'cursor' : self.con.cursor()}
+        args = [stock_stmt, join_stock_func]
+        args += insert_args
+        kwargs = {}
+        kwargs.update(insert_kwargs)
+        linkers.append(Task(name, f, *args, **kwargs))
 
-    @staticmethod
-    def link_all():
-        pass
+        # -- phenotypes --
+        it = zip(self.pheno_uniquenames, geos)
+        values = ','.join("('{}', '{}')".format(p, g) for p,g in it)
+        pheno_stmt = stmt.format(result='phenotype_id', values=values,
+                                 join='phenotype', join_col='uniquename')
+        def join_pheno_func(_, stmt_res):
+            return stmt_res
 
-    # FIXME: missleading name, does so much more than just create phenotypeing
+        name = 'link phenotypes'
+        if tname: name = name + '({})'.format(tname)
+        f = self.chado.fetch_y_insert_into
+        insert_args = ['nd_experiment_phenotype', None, self.EXP_PHENO_COLS]
+        insert_kwargs = {'cursor' : self.con.cursor()}
+        args = [pheno_stmt, join_pheno_func]
+        args += insert_args
+        kwargs = {}
+        kwargs.update(insert_kwargs)
+        linkers.append(Task(name, f, *args, **kwargs))
+
+        return linkers
+
+    # FIXME: missleading name, we do so much more than just create phenotypeing
     #        entries..
     def create_phenotype(self, stocks, descs, others=[], genus=None,
                          tname=None):
@@ -618,18 +648,18 @@ class ChadoDataLinker(object):
         # T1.X - create_X from <others>
         #
         # T2   - upload phenotypes from <descs>
+        self.pheno_uniquenames = [] # used to later query the ids
         t_phenos = self.__t2_create_phenoes(stocks, descs, tname)
 
         # T3   - get geolocation ids        # has already been uploaded..
         # T3   - create_nd_experiment
         t_experiment = self.__t3_create_experiments(others, stocks)
 
-        # T4   - get stock ids
-        # T4   - get stockprop ids
-        # T4   - get phenotype ids
-        # T4   - get nd_experiment ids
-        # T4   - link all the things
-        t_link = self.__t4_link(stocks)
+        # T4   - get stock ids, and nd_experiment ids
+        # T4   - get phenotype ids, and nd_experiment ids
+        # T4   - link 'em
+        t_link = self.__t4_link(others, stocks)
+        del self.pheno_uniquenames
 
         return ([t_stockprop, t_phenos, t_experiment], t_link)
 
@@ -656,7 +686,7 @@ for table in ChadoPostgres.COMMON_TABLES:
 # Create convenient methods:
 #   .get_db() .get_cv() .get_..
 for table in ChadoPostgres.COMMON_TABLES + ['organism', 'nd_geolocation',
-        'dbxref', 'stockprop']:
+        'dbxref', 'stockprop', 'nd_experiment']:
     prefix = 'get_'
     newfget_name = prefix+table
     if not hasattr(ChadoPostgres, newfget_name):
