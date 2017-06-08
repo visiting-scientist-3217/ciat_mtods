@@ -246,15 +246,28 @@ class TableGuru(utility.VerboseQuiet):
                 raise NotImplementedError(msg.format(func_name))
             current = get_all_func()
 
-            unknown = [i for i in self.data if not is_in(i, current)]
+            #unknown = [i for i in self.data if not is_in(i, current)]
+            unknown = []
+            for i in self.data:
+                if not is_in(i, current) and not is_in(i, unknown):
+                    unknown.append(i)
         else:
             unknown = self.data
+
+        if len(unknown) != len(set(unknown)):
+            class ThisIsBad(RuntimeError): pass
+            class ThisIsVeryBad(RuntimeError): pass
+            if raw:
+                eclass = ThisIsVeryBad
+            else: 
+                eclass = ThisIsBad
+            msg = '[{}] len(unknown) != len(set(unknown))'.format(tab)
+            raise eclass(msg)
 
         # Blacklist contains oracle attributes, which we understand according
         # to ontology or configuration, but which don't exist the OracleDB.
         # This is most likely a mistake in the ontology or configuration.
-        # So we better pass this list to someone who cares (and is able to fix
-        # it).
+        # So we better pass this list to someone who is able to fix it.
         blacklist = []
 
         needed_data = []
@@ -342,8 +355,8 @@ class TableGuru(utility.VerboseQuiet):
             cvt_ns = needed_cvts
             cvt_ds = []
 
-        return self.linker.create_cvterm(self.dbname, self.cvname, cvt_ns,
-                                         definition=cvt_ds, tname=f_ext)
+        return self.linker.create_cvterm(cvt_ns, definition=cvt_ds,
+                                         tname=f_ext)
 
     def __check_and_add_stocks(self):
         '''Tasks to upload the genexpression information.
@@ -352,11 +365,15 @@ class TableGuru(utility.VerboseQuiet):
         '''
         stocks = self.__get_needed_data('stock')
 
+        print 'yyy', stocks
         if stocks:
-            stocks = [(i['stock.uniquename'], i['stock.name']) for i in stocks]
+            stock_ns = [i['stock.name'] for i in stocks]
+            stock_us = [i['stock.uniquename'] for i in stocks]
             orga = self.chado.get_organism(where="common_name = 'Cassava'")[0]
             germpl_t = GERMPLASM_TYPE # < TODO remove hardcoding   ^
-            return self.linker.create_stock(stocks, germpl_t, orga)
+            return self.linker.create_stock(stock_ns, orga,
+                                            stock_uniqs=stock_us,
+                                            germplasm_t=germpl_t)
 
     def __check_and_add_sites(self):
         '''Creates MCL spreadsheets to upload the geolocation information.
@@ -454,7 +471,8 @@ class TableGuru(utility.VerboseQuiet):
         where = "common_name = '{}'".format(crp)
         genus = self.chado.get_organism(where=where)[0].genus
 
-        t_phen = self.linker.create_phenotype(stocks, descs, other=others, genus=genus)
+        t_phen = self.linker.create_phenotype(stocks, descs, others=others,
+                                              genus=genus)
         return (t_cvt, t_phen)
 
     def __get_trait_name(self, trait):
@@ -507,12 +525,12 @@ class TableGuru(utility.VerboseQuiet):
         t.update({'phenos' : self.__check_and_add_phenotypes()})
 
         # Replace None values with dummies.
-        for k,v in t.itervalues():
+        for k,v in t.iteritems():
             if v is None:
                 t[k] = Task('Empty', lambda: None, [], {})
 
         # we are done with it
-        del self.data
+        #del self.data
 
         # the tasks variable is explained in migration.py -> __parallel_upload
         tasks = (

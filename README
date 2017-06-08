@@ -7,8 +7,14 @@ Environment:
                     for the connection you will be prompted for the password.
     ORACLEDB_PW     Oracle database password. Same ^ here.
 
-I think its unlikely that this code will be of much use for anyone else. Though
-the Chado API is nice (for our purposes at least).
+I think its unlikely that this code will be of much use for anyone else (should
+at least be beautifyed/cleaned). Though the Chado API is okay-isch.
 
 Configuration:
-	trans.conf
+    trans.conf
+
+Requirements:
+    python2.7
+    python-gevent
+    oracle-xe (oracledb library)
+    Oracle-cx (python library using oracle-xe)

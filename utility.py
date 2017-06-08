@@ -8,6 +8,11 @@ import threading
 from collections import namedtuple
 from re import sub
 
+# So psycopg2 is level 2 threadsave, but our std-lib is not. Here you see the
+# easiest way I could think of to fix this:
+from gevent import monkey
+monkey.patch_all()
+
 def invert_dict(d):
     '''Switch keys with values in a dict.'''
     new = {}
@@ -110,14 +115,17 @@ class Task(VerboseQuiet):
     '''Used for multithreading implementation.'''
     def __init__(self, name, job, *args, **kwargs):
         super(self.__class__, self).__init__()
-        #self.VERBOSE = True
+        self.VERBOSE = True
         self.name = name
         self.job = job
         self.args = args
         self.kwargs = kwargs
-    def execute(self):
+    def execute(self, thread=False):
         '''Calls self.job with given args and kwargs.'''
-        msg = '\n[exec] {}'
+        if thread:
+            msg = '\n[exec-thrd] {}'
+        else:
+            msg = '\n[exec] {}'
         self.vprint(msg.format(self.__str__()[:70]+'...)'))
         self.job(*self.args, **self.kwargs)
     def __str__(self):
@@ -143,6 +151,39 @@ class Task(VerboseQuiet):
                 Task.non_parallel_upload(t)
         else:
             tasks.execute()
+
+    @staticmethod
+    def parallel_upload(tasks):
+        '''Start upload instances in as manny threads as possible.
+
+        Syntax: A tuple() declares ordered execution, a list() parallel
+                execution.
+
+        Examples for tasks = ..
+            [a, b, c]
+                a, b and c will be uploaded in parallelly
+            [(a, b), c]
+                b will be uploaded after a
+                and (a,b) will be uploaded parallelly to c
+            ([a, b], c)
+                a and b will be uploaded parallelly
+                and [a,b] will be uploaded before c
+
+        Realistically we can only parallelize stocks and sites and contacts.
+            => ([stocks, sites, ?], phenotypes)
+        '''
+        if type(tasks) == tuple:
+            for t in tasks:
+                Task.parallel_upload(t)
+        elif type(tasks) == list:
+            ts = []
+            for t in tasks:
+                t = threading.Thread(target=Task.parallel_upload, args=[t])
+                ts.append(t)
+            map(lambda x: x.start(), ts)
+            map(lambda x: x.join(), ts)
+        else:
+            tasks.execute(thread=True)
 
     @staticmethod
     def print_tasks(ts, pre=''):

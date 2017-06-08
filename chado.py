@@ -123,6 +123,7 @@ class ChadoPostgres(object):
         
         Needs a cursor to execute the insert statement.
         '''
+        print 'xxx', values[:5]
         if not type(values[0]) in [list, tuple]:
             msg = 'expected values = [[...], [...], ...]\n\tbut received: {}'
             msg = msg.format(str(values)[:50])
@@ -131,6 +132,7 @@ class ChadoPostgres(object):
             raise RuntimeError('need cursor object')
         f = StringIO('\n'.join('\t'.join(str(v) for v in vs) for vs in values))
         cursor.copy_from(f, table, columns=columns)
+        cursor.connection.commit()
 
     @staticmethod
     def fetch_y_insert_into(fetch_stmt, values_constructor, *insert_args,
@@ -405,12 +407,19 @@ class ChadoDataLinker(object):
             cvterm = self.chado.get_cvterm(where="name = '{}'".format(term))[0]
         return cvterm
 
-    def create_stock(self, stocks, organism, tname=None, germplasm_t='cultivar'):
-        '''Create (possibly multiple) Tasks to upload stocks.'''
+    def create_stock(self, stock_names, organism, stock_uniqs=None,
+                     tname=None, germplasm_t='cultivar'):
+        '''Create (possibly multiple) Tasks to upload stocks.
+
+        If stock_uniqs is not given, it will be set equal to stock_names.
+        '''
         cvt = self.__get_or_create_cvterm(germplasm_t)
         type_id = cvt.cvterm_id
         o_id = organism.organism_id
-        content = [[o_id, s, s, type_id] for s in stocks]
+        if not stock_uniqs:
+            stock_uniqs = stock_names
+        it = zip(stock_names, stock_uniqs)
+        content = [[o_id, sn, su, type_id] for sn,su in it]
 
         name = 'stock upload'
         if tname: name = name + '({})'.format(tname)
@@ -497,7 +506,7 @@ class ChadoDataLinker(object):
         return [t,]
 
     def __t1_create_stockprop(self, stocks, others, tname):
-        t_stockprop = [Task.init_empty()]
+        t_stockprop = []
 
         # -- arg.. FIXME? this is only a problem for the unittests..
         # because the spreadsheets wanted state, we went with it, and now that
@@ -506,7 +515,7 @@ class ChadoDataLinker(object):
         curr_stock_names = [i.name for i in curr_stocks]
         stocks = [i for i in stocks if i in curr_stock_names]
         if not stocks:
-            return Task.init_empty()
+            return [Task.init_empty()]
         # -- arg..
 
         for stockprop in self.STOCKPROPS:

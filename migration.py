@@ -73,47 +73,6 @@ class Migration(utility.VerboseQuiet):
         table_names = [t[0] for t in table_names]
         return table_names
 
-    def __parallel_upload(self, tasks):
-        '''Start upload instances in as manny threads as possible.
-
-        Syntax: A tuple() declares ordered execution, a list() parallel
-                execution.
-
-        Examples for tasks = ..
-            [a, b, c]
-                a, b and c will be uploaded in parallelly
-            [(a, b), c]
-                b will be uploaded after a
-                and (a,b) will be uploaded parallelly to c
-            ([a, b], c)
-                a and b will be uploaded parallelly
-                and [a,b] will be uploaded before c
-
-        Realistically we can only parallelize stocks and sites and contacts.
-            => ([stocks, sites], phenotypes)
-        '''
-        if type(tasks) == tuple:
-            for t in tasks:
-                self.__parallel_upload(t)
-        elif type(tasks) == list:
-            ts = []
-            for t in tasks:
-                t = threading.Thread(target=self.__parallel_upload, args=(t))
-                ts.append(t)
-            map(lambda x: x.start(), ts)
-            map(lambda x: x.join(), ts)
-        else:
-            self.vprint('[+] starting upload: {}'.format(tasks))
-            tasks.execute()
-
-    def __non_parallel_upload(self, tasks):
-        '''Non parallel upload for testing purposes.'''
-        if not tasks is Task:
-            for t in tasks:
-                self.__non_parallel_upload(t)
-        else:
-            tasks.execute()
-
     def full(self, basedir=BASE_DIR):
         '''We call the table migration task for all tables in
         TABLES_MIGRATION_IMPLEMENTED.
@@ -137,6 +96,5 @@ class Migration(utility.VerboseQuiet):
         self.vprint('[+] starting migrate({})'.format(table))
         self.tg.table = table
         tasks = self.tg.create_upload_tasks(update=self.only_update)
-        for t in tasks:
-            self.__parallel_upload(t)
+        Task.parallel_upload(tasks)
 

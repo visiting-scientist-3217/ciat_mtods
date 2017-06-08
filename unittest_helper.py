@@ -13,7 +13,10 @@ class PostgreRestorer():
     c_dump = 'sudo -u postgres pg_dump -Fc {db}'
     c_drop = 'sudo -u postgres dropdb {db}'
     c_crea = 'sudo -u postgres createdb {db}'
-    c_res = 'sudo -u postgres pg_restore --dbname={db} '
+    c_res = 'sudo -u postgres pg_restore -j 8 --dbname={db} '
+    #restore_tables = ['stock', 'cvterm', 'cv', 'phenotype', 'nd_geolocation',
+    #                  'nd_experiment', 'nd_experiment_stock',
+    #                  'nd_experiment_phenotype', 'contact']
 
     # Outside of project folder cuz of paranoia.
     MASTERDUMP = os.path.join(os.path.expanduser('~'), 'ciat', 'ALLDB.dump')
@@ -40,6 +43,10 @@ class PostgreRestorer():
             msg = 'Should renew your {}'.format(self.MASTERDUMP)
             raise Warning(msg)
 
+    #def __mktables(self):
+    #    tabs = map(lambda x: '-t chado.{}'.format(x), self.restore_tables)
+    #    return ' '.join(tabs)
+
     def __exe_c(self, cmd):
         '''Print execute, and throw on non-0 return value.'''
         cmd = cmd.format(db=self.db)
@@ -60,7 +67,7 @@ class PostgreRestorer():
         fd.close()
 
     def restore(self):
-        '''Restore current chado data of our DB.'''
+        '''Restore current chado data of our DB, returns True on success.'''
         drop_success, crea_success, res_success = False, False, False
         for tries in range(3):
             try:
@@ -76,6 +83,13 @@ class PostgreRestorer():
                 break
             except Exception as e:
                 print '[.restore] failed cuz {}'.format(e)
-                print '[.restore] Try fixit and press <Enter>'
-                input()
+                try:
+                    raw_input('[.restore] Try fixit and press <Enter>')
+                except KeyboardInterrupt:
+                    return False
+                except EOFError:
+                    continue
+        else:
+            return False
+        return True
 

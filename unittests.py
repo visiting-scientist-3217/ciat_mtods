@@ -189,11 +189,11 @@ class PostgreTests(unittest.TestCase):
     #def test_phenotype_tasks(self):
         ts = ConTest.linker.create_phenotype(*self.pheno_args,
                                              **self.pheno_kwargs)
-        print '\n=== Tasks Start ==='
+        print '\n=== Tasks Start (small test suite) ==='
         utility.Task.print_tasks(ts)
-        print '=== Tasks End ==='
+        print '=== Tasks End (small test suite) ==='
         pre_len = len(ConTest.chadodb.get_phenotype())
-        utility.Task.non_parallel_upload(ts)
+        utility.Task.parallel_upload(ts)
         post_len = len(ConTest.chadodb.get_phenotype())
         msg = 'creation of phenotypes failed'
         self.assertGreaterEqual(post_len, pre_len + 3, msg)
@@ -234,14 +234,14 @@ class OracleTests(unittest.TestCase):
 
 class BigTest(unittest.TestCase):
     '''Monolitic tests, building up some state.'''
-    enableThisMonoliticTestWithLongDuration = False
+    enableThisMonoliticTestWithLongDuration = True
 
     # Append my msg to default msg.
     longMessage = True 
 
     # Number of lines imported, this should directly correlate to the added
     # rows of phenotyping data in chado. If 'None' all data will be used.
-    NTEST = 100
+    NTEST = 300
 
     def step10_stateful_setup(self):
         self.done_pg_backup = False
@@ -249,30 +249,43 @@ class BigTest(unittest.TestCase):
         self.done_restore = False
         self.oracle = ConTest.oracledb
         self.t1 = migration.Migration.TABLES_MIGRATION_IMPLEMENTED[0]
-        self.tg = table_guru.TableGuru(self.t1, self.oracle, basedir=PATH)
+        self.tg = table_guru.TableGuru(self.t1, self.oracle, basedir=PATH,
+                                       update=True)
         self.pgr = PGR()
+        self.n_phenos0 = self.__get_pheno_count()
+
+    def step11_create_upload_tasks(self):
+        self.pgr.dump()
+        print '-- done backup'
+        self.done_pg_backup = True
+        self.need_rollback = True
+        self.ts = self.tg.create_upload_tasks(test=self.NTEST)
+        print '\n=== Tasks Start (big test suite) ==='
+        utility.Task.print_tasks(self.ts)
+        print '=== Tasks End (big test suite) ==='
+
+    def step12_upload_data(self):
+        print '-- need rollback'
+        utility.Task.non_parallel_upload(self.ts)
 
     def step20_inside_tests(self):
         if not self.need_rollback:
             print '[-] cannot do inside tests, as no data was uploaded'
             return
-        msg = 'should have at least the amount of phenotypes, that we uploaded'\
-            + 'as rows, realistically it should be a multiple of that number'
-        minimum = self.n_phenos0 + self.NTEST * 2
-        curr_phenos = ConTest.chadodb.count_from('phenotype')
-        self.assertGreaterEqual(curr_phenos, minimum, msg)
 
     def step90_stateful_teardown(self):
-        self.cleanup()
+        if self.need_rollback:
+            wait=True
+        else:
+            wait=False
+        self.cleanup(wait_for_inp=wait)
 
     def step91_after_tests(self):
         # Open connection again to test, if the state reverted properly.
         ConTest.chadodb._ChadoPostgres__connect(chado.DB, chado.USER,
                                                 chado.HOST, chado.PORT)
-        stocks = ConTest.chadodb.get_stock()
         msg = 'PG Restore failed! You should restore the DB manually.'
-        self.assertEqual(self.n_stocks, len(stocks), msg)
-        self.assertEqual(self.n_phenos0, ConTest.chadodb.count_from('phenotype'), msg)
+        self.assertEqual(self.n_phenos0, self.__get_pheno_count(), msg)
 
     def cleanup(self, wait_for_inp=True):
         '''Wait for <Return>, then check if we need and can do a db rollback, if
@@ -284,9 +297,6 @@ class BigTest(unittest.TestCase):
             except Exception:
                 pass
 
-        for s in self.sprds:
-            SpreadsheetTests.rm(s)
-
         if not self.done_pg_backup and self.need_rollback:
             print '[-] Need manual db rollback.. '
         if self.done_pg_backup and self.need_rollback and not\
@@ -297,8 +307,9 @@ class BigTest(unittest.TestCase):
             self.tg.chado.c.close()
             self.tg.chado.con.close()
             # now restore..
-            self.pgr.restore()
-            self.done_restore = True
+            print '-- restoring'
+            if self.pgr.restore():
+                self.done_restore = True
         if self.done_restore:
             os.remove(self.pgr.dumpfile)
 
@@ -314,7 +325,7 @@ class BigTest(unittest.TestCase):
                     step()
                 except Exception as e:
                     traceback.print_exc(e)
-                    self.cleanup()
+                    self.cleanup(wait_for_inp=True)
                     break
 
     def __get_pheno_count(self):
