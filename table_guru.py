@@ -190,12 +190,17 @@ class TableGuru(utility.VerboseQuiet):
             return None, None, None, None
         def col_equal(ora, chad):
             for a,b in conf.iteritems():
-                try: # XXX print what fails here! ('RAICES_COMERCIALES')
+                try: # TODO print what fails here! ('RAICES_COMERCIALES')
                     if getattr(ora, a) != getattr(chad, b.split('.')[1]):
                         return False
                 except AttributeError:
                     continue
             return True
+        msg, fmt, j = '[equal-comp : {0}] {1}', '({0} == {1})', ','
+        it = conf.iteritems()
+        msg = msg.format(table,
+                         j.join(fmt.format(i,j.split('.')[1]) for i,j in it))
+        self.vprint(msg)
         def col_in(ora, chad_list):
             for c in chad_list:
                 if col_equal(ora, c):
@@ -247,10 +252,19 @@ class TableGuru(utility.VerboseQuiet):
             current = get_all_func()
 
             #unknown = [i for i in self.data if not is_in(i, current)]
+            # TODO would be nice if is_in would throw a TypeError if the first
+            # argument is not a OracleDB entry or the second one is not a list
+            # of Chado entries.
             unknown = []
             for i in self.data:
-                if not is_in(i, current) and not is_in(i, unknown):
+                msg = '[-] {0} {1} entry: {2}'
+                item = 'var:{0},gid:{1}'.format(getattr(i, 'VARIEDAD'),
+                                                getattr(i, 'GID'))
+                msg = msg.format('{}',tab,item)
+                if not is_in(i, current) and not i in unknown:
                     unknown.append(i)
+                elif is_in(i, current): self.vprint(msg.format('known'))
+                elif i in unknown: self.vprint(msg.format('double'))
         else:
             unknown = self.data
 
@@ -364,8 +378,8 @@ class TableGuru(utility.VerboseQuiet):
         This functions refers to the chado 'stock' table.
         '''
         stocks = self.__get_needed_data('stock')
+        self.vprint('[+] stocks: {} rows'.format(len(stocks)))
 
-        print 'yyy', stocks
         if stocks:
             stock_ns = [i['stock.name'] for i in stocks]
             stock_us = [i['stock.uniquename'] for i in stocks]
@@ -381,6 +395,7 @@ class TableGuru(utility.VerboseQuiet):
         This functions refers to the chado 'nd_geolocation' table.
         '''
         sites = self.__get_needed_data('nd_geolocation')
+        self.vprint('[+] sites: {} rows'.format(len(sites)))
 
         if sites:
             mandatory_cvts = ['type', 'country', 'state', 'region', 'address',
@@ -403,6 +418,7 @@ class TableGuru(utility.VerboseQuiet):
         tasks = []
 
         contacts = self.__get_needed_data('contact')
+        self.vprint('[+] contacts: {} rows'.format(len(contacts)))
         if contacts:
             names = [i['contact.name'] for i in contacts]
             types = [i['contact.type_id'] for i in contacts]
@@ -417,6 +433,7 @@ class TableGuru(utility.VerboseQuiet):
         '''
         phenotypic_data, raw_data = \
             self.__get_needed_data('phenotype', mapping='oracle', raw=True)
+        self.vprint('[+] phenotypes: {} rows'.format(len(phenotypic_data)))
         if not phenotypic_data:
             return []
 
@@ -518,6 +535,10 @@ class TableGuru(utility.VerboseQuiet):
         sql = OSQL.get_all_from.format(table=self.table)
         self.data = self.oracle.get_rows(sql, table=self.table,
                                          fetchamount=test)
+
+        self.vprint('[+] data: {} rows'.format(len(self.data)))
+        self.vprint('[+] data set: {} rows'.format(len(set(self.data))))
+
         t = {}
         t.update({'stocks' : self.__check_and_add_stocks()})
         t.update({'sites' : self.__check_and_add_sites()})

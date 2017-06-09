@@ -250,7 +250,7 @@ class BigTest(unittest.TestCase):
         self.oracle = ConTest.oracledb
         self.t1 = migration.Migration.TABLES_MIGRATION_IMPLEMENTED[0]
         self.tg = table_guru.TableGuru(self.t1, self.oracle, basedir=PATH,
-                                       update=True)
+                                       update=True, verbose=True)
         self.pgr = PGR()
         self.n_phenos0 = self.__get_pheno_count()
 

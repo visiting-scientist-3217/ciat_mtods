@@ -13,7 +13,7 @@ class PostgreRestorer():
     c_dump = 'sudo -u postgres pg_dump -Fc {db}'
     c_drop = 'sudo -u postgres dropdb {db}'
     c_crea = 'sudo -u postgres createdb {db}'
-    c_res = 'sudo -u postgres pg_restore -j 8 --dbname={db} '
+    c_res = 'sudo -u postgres pg_restore -j 16 --dbname={db} '
     #restore_tables = ['stock', 'cvterm', 'cv', 'phenotype', 'nd_geolocation',
     #                  'nd_experiment', 'nd_experiment_stock',
     #                  'nd_experiment_phenotype', 'contact']

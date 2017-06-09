@@ -197,3 +197,12 @@ class Task(VerboseQuiet):
         else:
             if pre != '': pre = pre + '>'
             print pre, str(ts)[:50]+'...'
+
+def uniq(l, key=None):
+    'uniq(iterable, key=None) --> new list with unique entries'
+    r = []
+    if not key: key=lambda x: x
+    for i in l:
+        if not key(i) in r:
+            r.append(i)
+    return r

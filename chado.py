@@ -9,6 +9,7 @@ import re
 from utility import PostgreSQLQueries as PSQLQ
 from utility import make_namedtuple_with_query
 from utility import Task
+from utility import uniq
 from StringIO import StringIO
 from itertools import izip_longest as zip_pad
 from random import randint
@@ -123,7 +124,8 @@ class ChadoPostgres(object):
         
         Needs a cursor to execute the insert statement.
         '''
-        print 'xxx', values[:5]
+        msg = '[+] insert_into->{0}\n\t({1})\n\t-> (VALUES {2} ...])'
+        print msg.format(table, columns, str(values)[:60])
         if not type(values[0]) in [list, tuple]:
             msg = 'expected values = [[...], [...], ...]\n\tbut received: {}'
             msg = msg.format(str(values)[:50])
@@ -419,6 +421,10 @@ class ChadoDataLinker(object):
         if not stock_uniqs:
             stock_uniqs = stock_names
         it = zip(stock_names, stock_uniqs)
+        # need to make the name unique.. XXX do we rly need this?
+        it = uniq(it, key=lambda x: x[0])
+        # need to make the uniquename unique..
+        #it = uniq(it, key=lambda x: x[1])
         content = [[o_id, sn, su, type_id] for sn,su in it]
 
         name = 'stock upload'
@@ -472,36 +478,40 @@ class ChadoDataLinker(object):
         # get the stockprop type_id, possibly create it first
         if not ptype:
             raise RuntimeError('You need to specify a stockprop type.')
-        where = "name = '{}'".format(ptype)
-        try:
-            type_id = self.chado.get_cvterm(where=where)[0].cvterm_id
-        except IndexError:
-            ts = self.create_cvterm([ptype], definition=['stockprop'])
-            for t in ts: t.execute()
-            type_id = self.chado.get_cvterm(where=where)[0].cvterm_id
+        type_id = self.__get_or_create_cvterm(ptype).cvterm_id
 
         # get stock_ids joined with the values
-        sql = '''
+        stmt = '''
             SELECT s.stock_id,s.uniquename FROM (VALUES {}) AS v
                 JOIN stock s ON s.uniquename = v.column1
         '''
-        where = ','.join("('{}')".format(p[0]) for p in props)
-        sql = sql.format(where)
-        self.chado.c.execute(sql)
-        stocks = sorted(self.chado.c.fetchall(), key=lambda x: x[1])
-        props = sorted(props, key=lambda x: x[0])
-        if not len(stocks) == len(props):
-            print 'sss', stocks
-            print 'ppp', props
-            raise RuntimeError('unequal stocks/stockprops, unlikely')
-        join = zip(stocks, props)
-        content = [[sck[0],type_id,prp[1]] for sck,prp in join]
-        #               ^ stock_id     ^ value
+        values = ','.join("('{}')".format(p[0]) for p in props)
+        stmt = stmt.format(values)
+
+        def join_func(arg, stmt_res):
+            type_id = arg[0]
+            props = arg[1]
+            stocks = sorted(stmt_res, key=lambda x: x[1])
+            props = sorted(props, key=lambda x: x[0])
+            if not len(stocks) == len(props):
+                print 'sss', stocks
+                print 'ppp', props
+                raise RuntimeError('unequal stocks/stockprops, unlikely')
+            join = zip(stocks, props)
+            content = [[sck[0],type_id,prp[1]] for sck,prp in join]
+            #               ^ stock_id     ^ value
+            return content
+
         name = 'stockprop upload'
         if tname: name = name + '({})'.format(tname)
-        f = self.chado.insert_into
-        args = ('stockprop', content, self.STOCKPROP_COLS)
-        kwargs = {'cursor' : self.con.cursor()}
+        f = self.chado.fetch_y_insert_into
+        content = [type_id, props]
+        insert_args = ['stockprop', content, self.STOCKPROP_COLS]
+        insert_kwargs = {'cursor' : self.con.cursor()}
+        args = [stmt, join_func]
+        args += insert_args
+        kwargs = {}
+        kwargs.update(insert_kwargs)
         t = Task(name, f, *args, **kwargs)
         return [t,]
 
@@ -538,7 +548,7 @@ class ChadoDataLinker(object):
                     new = self.__get_or_create_cvterm(descriptor).cvterm_id
                     attr_ids.update({descriptor : new})
                 attr_id = attr_ids[descriptor]
-                # XXX is <uniq> unique enough?
+                # FIXME is <uniq> unique enough?
                 uniq = self.__construct_rnd(attr_id, value)
                 # we need to query these later to obtain the phenotype_id
                 self.pheno_uniquenames.append(uniq)
