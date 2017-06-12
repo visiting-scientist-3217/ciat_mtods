@@ -125,7 +125,8 @@ class ChadoPostgres(object):
         Needs a cursor to execute the insert statement.
         '''
         msg = '[+] insert_into->{0}\n\t({1})\n\t-> (VALUES {2} ...])'
-        print msg.format(table, columns, str(values)[:60])
+        print msg.format(table, columns, str(values)[:80])
+        if len(values) == 0: raise RuntimeError('No values to upload')
         if not type(values[0]) in [list, tuple]:
             msg = 'expected values = [[...], [...], ...]\n\tbut received: {}'
             msg = msg.format(str(values)[:50])
@@ -159,6 +160,9 @@ class ChadoPostgres(object):
         c = insert_kwargs['cursor']
         c.execute(fetch_stmt)
         fetch_res = c.fetchall()
+
+        print '[fetch_y_insert_into] stmt:\n\t{}'.format(fetch_stmt)
+        print '\tres: {}'.format(str(fetch_res)[:60]+'...')
 
         args = list(insert_args)
         # replaces values with the constructed join'ed ones
@@ -424,7 +428,7 @@ class ChadoDataLinker(object):
         # need to make the name unique.. XXX do we rly need this?
         it = uniq(it, key=lambda x: x[0])
         # need to make the uniquename unique..
-        #it = uniq(it, key=lambda x: x[1])
+        it = uniq(it, key=lambda x: x[1])
         content = [[o_id, sn, su, type_id] for sn,su in it]
 
         name = 'stock upload'

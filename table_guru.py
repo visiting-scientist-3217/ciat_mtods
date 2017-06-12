@@ -10,6 +10,9 @@ import datetime
 CONF_PATH = 'trans.conf'
 GERMPLASM_TYPE = 'cultivar' # constant(3 options) from MCL
 
+class ThisIsBad(RuntimeError):     pass
+class ThisIsVeryBad(RuntimeError): pass
+
 class TableGuru(utility.VerboseQuiet):
     '''This guy understands those spanish Oracle databases.
 
@@ -54,6 +57,9 @@ class TableGuru(utility.VerboseQuiet):
         self.QUIET = False
         self.basedir = basedir
         self.update = update
+        if not update:
+            raise Warning('Deprecated flag: "update", only usefull for'\
+                + ' spreadsheets.')
 
         self.oracle = oracledb
         if not self.oracle.cur:
@@ -188,9 +194,13 @@ class TableGuru(utility.VerboseQuiet):
         conf, c_conf = self.__get_config(chado_table=table)
         if not conf:
             return None, None, None, None
-        def col_equal(ora, chad):
+        def is_eq(ora, chad):
             for a,b in conf.iteritems():
                 try: # TODO print what fails here! ('RAICES_COMERCIALES')
+                    msg =  '[is_eq] {0}->{1} != {2}->{3} : returns {4}'
+                    print msg.format(a, getattr(ora, a), b, getattr(chad,
+                                     b.split('.')[1]), getattr(ora, a) !=
+                                     getattr(chad, b.split('.')[1]))
                     if getattr(ora, a) != getattr(chad, b.split('.')[1]):
                         return False
                 except AttributeError:
@@ -201,12 +211,12 @@ class TableGuru(utility.VerboseQuiet):
         msg = msg.format(table,
                          j.join(fmt.format(i,j.split('.')[1]) for i,j in it))
         self.vprint(msg)
-        def col_in(ora, chad_list):
+        def is_in(ora, chad_list):
             for c in chad_list:
-                if col_equal(ora, c):
+                if is_eq(ora, c):
                     return True
             return False
-        return col_equal, col_in, conf, c_conf
+        return is_eq, is_in, conf, c_conf
 
     def __get_needed_data(self, tab, mapping='chado', raw=False):
         '''Returns data to upload as a list() of dict()'s for chado table
@@ -232,6 +242,16 @@ class TableGuru(utility.VerboseQuiet):
         # Get the config, and create according compare-functions.
         is_equal, is_in, trg, trg_c = self.__get_compare_f(tab)
 
+        # comparing with phenotype.value doesn't make any sense, we would need
+        # to:
+        #   1. lookup attr_id->cvterm.name
+        #   2. lookup stock_id->stock.name
+        #   3. compare VARIEDAD with stock.name and attr_id with phenotype name
+        # TODO make phenotype comparisons happen, will be performance heavy
+        if tab == 'phenotype':
+            def is_in(_, __):
+                return False
+
         if not trg and not trg_c:
             msg = '[{}] no CONFIG found => not uploading any related data'
             self.qprint(msg.format(tab))
@@ -251,8 +271,7 @@ class TableGuru(utility.VerboseQuiet):
                 raise NotImplementedError(msg.format(func_name))
             current = get_all_func()
 
-            #unknown = [i for i in self.data if not is_in(i, current)]
-            # TODO would be nice if is_in would throw a TypeError if the first
+            # It would be nice if is_in would throw a TypeError if the first
             # argument is not a OracleDB entry or the second one is not a list
             # of Chado entries.
             unknown = []
@@ -263,18 +282,15 @@ class TableGuru(utility.VerboseQuiet):
                 msg = msg.format('{}',tab,item)
                 if not is_in(i, current) and not i in unknown:
                     unknown.append(i)
+                    self.vprint('[+] adding {0}: {1}'.format(tab,item))
                 elif is_in(i, current): self.vprint(msg.format('known'))
                 elif i in unknown: self.vprint(msg.format('double'))
         else:
             unknown = self.data
 
         if len(unknown) != len(set(unknown)):
-            class ThisIsBad(RuntimeError): pass
-            class ThisIsVeryBad(RuntimeError): pass
-            if raw:
-                eclass = ThisIsVeryBad
-            else: 
-                eclass = ThisIsBad
+            if raw: eclass = ThisIsVeryBad
+            else:   eclass = ThisIsBad
             msg = '[{}] len(unknown) != len(set(unknown))'.format(tab)
             raise eclass(msg)
 
@@ -381,8 +397,12 @@ class TableGuru(utility.VerboseQuiet):
         self.vprint('[+] stocks: {} rows'.format(len(stocks)))
 
         if stocks:
+            # Stocks might be unique tuples, BUT neither stock.name nor
+            # stock.uniquename is completely unique in our database. Thus we
+            # need to filter AGAIN..
             stock_ns = [i['stock.name'] for i in stocks]
-            stock_us = [i['stock.uniquename'] for i in stocks]
+            #stock_us = [i['stock.uniquename'] for i in stocks]
+            stock_us = stock_ns
             orga = self.chado.get_organism(where="common_name = 'Cassava'")[0]
             germpl_t = GERMPLASM_TYPE # < TODO remove hardcoding   ^
             return self.linker.create_stock(stock_ns, orga,
@@ -398,17 +418,13 @@ class TableGuru(utility.VerboseQuiet):
         self.vprint('[+] sites: {} rows'.format(len(sites)))
 
         if sites:
+            # I don't know how this is possible but get duplicates at this point.
+            sites = utility.uniq(sites)
             mandatory_cvts = ['type', 'country', 'state', 'region', 'address',
                               'site_code']
             t1 = self.__check_and_add_cvterms(mandatory_cvts, f_ext='pre_sites')
             t2 = self.linker.create_geolocation(sites)
             return (t1, t2)
-            # We don't need to split the data anymore, cuz no spreadsheed
-            #names = [i['nd_geolocation.description'] for i in sites]
-            #alts = [i['nd_geolocation.altitude'] for i in sites]
-            #lats = [i['nd_geolocation.latitude'] for i in sites]
-            #longs = [i['nd_geolocation.longitude'] for i in sites]
-            #t2 = self.linker.create_geolocation(names, alts, lats, longs)
 
     def __check_and_add_contacts(self):
         '''Creates MCL spreadsheets to upload the contact information.
@@ -456,7 +472,8 @@ class TableGuru(utility.VerboseQuiet):
                         new.update({'plant_date' : d})
                     elif 'pick' in k:
                         new.update({'pick_date' : d})
-            others.append(new)
+            if not new in others:
+                others.append(new)
 
         # Get the real phenotyping data into position.
         descs = []
@@ -502,9 +519,8 @@ class TableGuru(utility.VerboseQuiet):
             return ''
         vonto = self.onto.mapping[trait]
         if len(vonto) > 1:
-            msg = '[.__get_trait_name] Note: we dont use all information we'\
-                + ' found.'
-            self.vprint(msg)
+            msg = 'Warning: We dont use all information we found.'
+            self.qprint(msg)
         vonto = vonto[0]
         name = vonto.TRAIT_NAME
         return name

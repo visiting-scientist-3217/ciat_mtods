@@ -1,4 +1,5 @@
 #!/usr/bin/python
+import utility # must be first cause of monkey-patching
 import unittest
 import traceback
 from unittest_helper import PostgreRestorer as PGR
@@ -9,7 +10,6 @@ import cassava_ontology
 import getpass
 import migration
 import table_guru
-import utility
 
 PATH='testpath'
 
@@ -36,7 +36,17 @@ class ConTest(unittest.TestCase):
 
 class PostgreTests(unittest.TestCase):
     longMessage = True
-
+    TEST_SQL_ALL_LINKED = '''
+        SELECT p.value,s.uniquename FROM nd_experiment AS e
+            JOIN nd_experiment_stock es
+                ON e.nd_experiment_id = es.nd_experiment_id
+            JOIN nd_experiment_phenotype ep
+                ON e.nd_experiment_id = ep.nd_experiment_id
+            JOIN phenotype p
+                ON p.phenotype_id = ep.phenotype_id
+            JOIN stock s
+                ON s.stock_id = es.stock_id
+    '''
     # set variables used in tearDown
     @classmethod
     def setUpClass(cls):
@@ -146,6 +156,8 @@ class PostgreTests(unittest.TestCase):
             t.execute()
         post_len = len(ConTest.chadodb.get_nd_geolocation())
         msg = 'creation of geolocations failed'
+        self.assertGreaterEqual(pre_len + 2, post_len, msg)
+        msg = 'equal comparison of geolocations failed'
         self.assertEqual(pre_len + 2, post_len, msg)
         sts = [i.description for i in ConTest.chadodb.get_nd_geolocation()]
         self.assertIn(self.sites[0]['nd_geolocation.description'], sts, msg)
@@ -199,17 +211,7 @@ class PostgreTests(unittest.TestCase):
         self.assertGreaterEqual(post_len, pre_len + 3, msg)
         
         # check if we linked all the things correctly
-        sql = '''
-            SELECT p.value,s.uniquename FROM nd_experiment AS e
-                JOIN nd_experiment_stock es
-                    ON e.nd_experiment_id = es.nd_experiment_id
-                JOIN nd_experiment_phenotype ep
-                    ON e.nd_experiment_id = ep.nd_experiment_id
-                JOIN phenotype p
-                    ON p.phenotype_id = ep.phenotype_id
-                JOIN stock s
-                    ON s.stock_id = es.stock_id
-        '''
+        sql = self.TEST_SQL_ALL_LINKED
         ConTest.chadodb.c.execute(sql)
         r = ConTest.chadodb.c.fetchall()
         phenoes = [i[0] for i in r]
@@ -241,7 +243,7 @@ class BigTest(unittest.TestCase):
 
     # Number of lines imported, this should directly correlate to the added
     # rows of phenotyping data in chado. If 'None' all data will be used.
-    NTEST = 300
+    NTEST = 10
 
     def step10_stateful_setup(self):
         self.done_pg_backup = False
@@ -272,6 +274,13 @@ class BigTest(unittest.TestCase):
         if not self.need_rollback:
             print '[-] cannot do inside tests, as no data was uploaded'
             return
+        sql = PostgreTests.TEST_SQL_ALL_LINKED
+        ConTest.chadodb.c.execute(sql)
+        r = ConTest.chadodb.c.fetchall()
+        phenoes = [i[0] for i in r]
+        stocks = [i[1] for i in r]
+        self.assertFalse(not stocks)
+        self.assertFalse(not phenoes)
 
     def step90_stateful_teardown(self):
         if self.need_rollback:
@@ -331,11 +340,24 @@ class BigTest(unittest.TestCase):
     def __get_pheno_count(self):
         return ConTest.chadodb.count_from('phenotype')
 
+class UtilityTests(unittest.TestCase):
+    def test_uniq_func(self):
+        a = [1, 2, 3, 1, 2]
+        b = [1, 32, '1', 'f']
+        c = [1, 32, '1', 'f', 32]
+        self.assertNotEqual(utility.uniq(a), a)
+        self.assertEqual(utility.uniq(b), b)
+        self.assertNotEqual(utility.uniq(c), c)
+        d = [[1, 'a'], [3, 'a']]
+        self.assertEqual(utility.uniq(d, key=lambda x: x[0]), d)
+        self.assertNotEqual(utility.uniq(d, key=lambda x: x[1]), d)
+
 
 def run():
     ts = unittest.TestSuite()
     tl = unittest.TestLoader()
     ts.addTest(tl.loadTestsFromTestCase(ConTest))
+    ts.addTest(tl.loadTestsFromTestCase(UtilityTests))
     ts.addTest(tl.loadTestsFromTestCase(PostgreTests))
     ts.addTest(tl.loadTestsFromTestCase(OracleTests))
     ts.addTest(tl.loadTestsFromTestCase(BigTest))

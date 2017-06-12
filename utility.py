@@ -4,14 +4,18 @@
     - commonly used functions
     - ?
 '''
-import threading
-from collections import namedtuple
-from re import sub
 
 # So psycopg2 is level 2 threadsave, but our std-lib is not. Here you see the
 # easiest way I could think of to fix this:
 from gevent import monkey
-monkey.patch_all()
+monkey.patch_all() # needs to be executed before threading, because the
+                   # mainthread gets index'ed on that import, and gevent
+                   # replaces the indexing function, thus will create another
+                   # index value, which will later lead to a crash
+
+import threading
+from collections import namedtuple
+from re import sub
 
 def invert_dict(d):
     '''Switch keys with values in a dict.'''
@@ -200,9 +204,18 @@ class Task(VerboseQuiet):
 
 def uniq(l, key=None):
     'uniq(iterable, key=None) --> new list with unique entries'
-    r = []
-    if not key: key=lambda x: x
-    for i in l:
-        if not key(i) in r:
-            r.append(i)
-    return r
+    if not key:
+        r = []
+        for i in l:
+            if not i in r:
+                r.append(i)
+        return r
+    else:
+        keyed_list = []
+        unkeyed_list = []
+        for i in l:
+            keyed_i = key(i)
+            if not keyed_i in keyed_list:
+                keyed_list.append(keyed_i)
+                unkeyed_list.append(i)
+        return unkeyed_list

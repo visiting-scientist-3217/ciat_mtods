@@ -1,5 +1,5 @@
 '''The Migration-Task-Class'''
-import utility
+import utility # must be first cause of monkey-patching
 import os
 import table_guru
 import threading

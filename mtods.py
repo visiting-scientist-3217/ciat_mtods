@@ -1,8 +1,7 @@
 #!/usr/bin/python
 '''\
 MtODS -- _M_igrate _t_he _O_racle _D_atabase _S_tuff
-To our Chado schema, by .. creating excel files, which are then parsed and
-uploaded by MCL.
+ .. to our Chado schema.
 '''
 
 #NOTE For production we should rewrite the 'Full Migration'-option, to start
