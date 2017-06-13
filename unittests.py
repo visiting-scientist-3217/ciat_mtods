@@ -243,7 +243,7 @@ class BigTest(unittest.TestCase):
 
     # Number of lines imported, this should directly correlate to the added
     # rows of phenotyping data in chado. If 'None' all data will be used.
-    NTEST = 10
+    NTEST = 10000
 
     def step10_stateful_setup(self):
         self.done_pg_backup = False
@@ -252,7 +252,7 @@ class BigTest(unittest.TestCase):
         self.oracle = ConTest.oracledb
         self.t1 = migration.Migration.TABLES_MIGRATION_IMPLEMENTED[0]
         self.tg = table_guru.TableGuru(self.t1, self.oracle, basedir=PATH,
-                                       update=True, verbose=True)
+                                       update=True, verbose=False)
         self.pgr = PGR()
         self.n_phenos0 = self.__get_pheno_count()
 
@@ -261,14 +261,16 @@ class BigTest(unittest.TestCase):
         print '-- done backup'
         self.done_pg_backup = True
         self.need_rollback = True
-        self.ts = self.tg.create_upload_tasks(test=self.NTEST)
-        print '\n=== Tasks Start (big test suite) ==='
-        utility.Task.print_tasks(self.ts)
-        print '=== Tasks End (big test suite) ==='
+        self.ts_gen = self.tg.create_upload_tasks(test=self.NTEST)
 
     def step12_upload_data(self):
         print '-- need rollback'
-        utility.Task.non_parallel_upload(self.ts)
+
+        for task_suite in self.ts_gen:
+            print '\n=== Tasks Start (big test suite) ==='
+            utility.Task.print_tasks(task_suite)
+            print '=== Tasks End (big test suite) ==='
+            utility.Task.non_parallel_upload(task_suite)
 
     def step20_inside_tests(self):
         if not self.need_rollback:

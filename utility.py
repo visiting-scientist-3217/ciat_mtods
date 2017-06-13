@@ -38,6 +38,9 @@ def make_namedtuple_with_query(cursor, query, name, data):
     '''
     cursor.execute(query)
     headers = [normalize(i[1]) for i in cursor.fetchall()]
+    return make_namedtuple_with_headers(headers, name, data)
+
+def make_namedtuple_with_headers(headers, name, data):
     NTuple = namedtuple(name, headers)
     result = [NTuple(*r) for r in data]
     return result
@@ -190,17 +193,16 @@ class Task(VerboseQuiet):
             tasks.execute(thread=True)
 
     @staticmethod
-    def print_tasks(ts, pre=''):
+    def print_tasks(ts, pre='', ind=False):
         '''One level of indentation equals parallel execution.'''
         if type(ts) == list:
-            for t in ts:
-                Task.print_tasks(t, pre=pre)
+            for t in ts: pre = Task.print_tasks(t, pre=pre, ind=False)
         elif type(ts) == tuple:
-            for t in ts:
-                Task.print_tasks(t, pre=pre+'\t')
+            for t in ts: pre = Task.print_tasks(t, pre=pre, ind=True)
         else:
-            if pre != '': pre = pre + '>'
-            print pre, str(ts)[:50]+'...'
+            print pre+'>', str(ts)[:80-(len(pre)*8)]+'...'
+        if ind: return pre + '\t'
+        else:   return pre
 
 def uniq(l, key=None):
     'uniq(iterable, key=None) --> new list with unique entries'

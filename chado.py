@@ -12,7 +12,7 @@ from utility import Task
 from utility import uniq
 from StringIO import StringIO
 from itertools import izip_longest as zip_pad
-from random import randint
+import random
 
 DB='drupal7'
 USER='drupal7'
@@ -124,8 +124,8 @@ class ChadoPostgres(object):
         
         Needs a cursor to execute the insert statement.
         '''
-        msg = '[+] insert_into->{0}\n\t({1})\n\t-> (VALUES {2} ...])'
-        print msg.format(table, columns, str(values)[:80])
+        #msg = '[+] insert_into->{0}\n\t({1})\n\t-> (VALUES {2} ...])'
+        #print msg.format(table, columns, str(values)[:80])
         if len(values) == 0: raise RuntimeError('No values to upload')
         if not type(values[0]) in [list, tuple]:
             msg = 'expected values = [[...], [...], ...]\n\tbut received: {}'
@@ -161,8 +161,8 @@ class ChadoPostgres(object):
         c.execute(fetch_stmt)
         fetch_res = c.fetchall()
 
-        print '[fetch_y_insert_into] stmt:\n\t{}'.format(fetch_stmt)
-        print '\tres: {}'.format(str(fetch_res)[:60]+'...')
+        #print '[fetch_y_insert_into] stmt:\n\t{}'.format(fetch_stmt[:200])
+        #print '\tres: {}'.format(str(fetch_res)[:60]+'...')
 
         args = list(insert_args)
         # replaces values with the constructed join'ed ones
@@ -439,9 +439,9 @@ class ChadoDataLinker(object):
         t = Task(name, f, *args, **kwargs)
         return [t,]
 
-    def __check_coords(self, ignore_me, lat, lon, alt):
+    def __check_coords(self, _, lat, lon, alt):
         ''''''
-        r = []
+        r = [_]
         for i in [lat, lon, alt]:
             try: 
                 i = re.sub(r'^\s*0*', '', i)
@@ -453,8 +453,8 @@ class ChadoDataLinker(object):
                 # fails, which is both fine.
                 pass
             finally:
+                if i in ['-','+','']: i = '0'
                 r.append(i)
-        r.insert(0, ignore_me)
         return r
 
     def create_geolocation(self, sites, tname=None):
@@ -492,9 +492,9 @@ class ChadoDataLinker(object):
         values = ','.join("('{}')".format(p[0]) for p in props)
         stmt = stmt.format(values)
 
-        def join_func(arg, stmt_res):
-            type_id = arg[0]
-            props = arg[1]
+        def join_func(content, stmt_res):
+            type_id = content[0]
+            props = content[1]
             stocks = sorted(stmt_res, key=lambda x: x[1])
             props = sorted(props, key=lambda x: x[0])
             if not len(stocks) == len(props):
@@ -504,6 +504,9 @@ class ChadoDataLinker(object):
             join = zip(stocks, props)
             content = [[sck[0],type_id,prp[1]] for sck,prp in join]
             #               ^ stock_id     ^ value
+            # Only one value per stock, per stockprop (Also per rank, but we
+            # don't use rank).
+            content = uniq(content, key=lambda x: x[0])
             return content
 
         name = 'stockprop upload'
@@ -540,8 +543,12 @@ class ChadoDataLinker(object):
         return t_stockprop
 
     def __construct_rnd(self, i, v):
+        a = 'abcdefghijklmnopqrstuvwxyz'
+        abc = a + a.upper()
+        l = [i for i in abc]
+        random.shuffle(l)
         s = '{0}_{1}_{2}'
-        return s.format(i,v,randint(1024,1048576))
+        return s.format(i,v,''.join(l))
 
     def __t2_create_phenoes(self, stocks, descs, tname=None):
         content = []
@@ -549,13 +556,14 @@ class ChadoDataLinker(object):
         for d,s in zip(descs, stocks):
             for descriptor, value in d.iteritems():
                 if not attr_ids.has_key(descriptor):
+                    # We create cvterm syncronously, as their numbers are low.
                     new = self.__get_or_create_cvterm(descriptor).cvterm_id
                     attr_ids.update({descriptor : new})
                 attr_id = attr_ids[descriptor]
-                # FIXME is <uniq> unique enough?
                 uniq = self.__construct_rnd(attr_id, value)
                 # we need to query these later to obtain the phenotype_id
                 self.pheno_uniquenames.append(uniq)
+                if value is None: value = ''
                 content.append([uniq, attr_id, value])
         name = 'phenotype upload'
         if tname: name = name + '({})'.format(tname)

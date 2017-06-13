@@ -11,11 +11,11 @@ Note:
     The default user account is {1}.\
 '''
 
+import utility
 import cx_Oracle
 import sys
 from getpass import getpass
 import os # environ -> db pw
-from utility import make_namedtuple_with_query
 from utility import OracleSQLQueries as OSQL
 
 # Don't worry he said, it's all internal he said.
@@ -47,6 +47,7 @@ class Oracledb():
         self.DSN = dsn
         self.con = None
         self.cur = None
+        self.saved_curs = {}
 
     def connect(self):
         '''Returns a tuple(connection_obj, cursor_obj).'''
@@ -68,7 +69,7 @@ class Oracledb():
             self.cur = self.con.cursor()
         return self.con, self.cur
 
-    def get_rows(self, sql, table=None, fetchamount=None, raw=False):
+    def get_rows(self, sql, table=None, fetchamount=None, raw=False, save_as=None):
         '''Execute a <sql>-statement, returns a namedtuple.
         
         If <table> is not given we return the raw data, else it is used to
@@ -85,36 +86,55 @@ class Oracledb():
             self.lasttable = table
             self.lastraw = raw
             header_sql = OSQL.get_column_metadata_from.format(table=table)
-            return make_namedtuple_with_query(self.cur, header_sql, table, data)
+            self.cur.execute(header_sql)
+            headers = [utility.normalize(i[1]) for i in self.cur.fetchall()]
+            self.lastheaders = headers
+            data = utility.make_namedtuple_with_headers(headers, table, data)
         else:
-            return data
+            print '[get_rows] need table=<> to return non-raw data'
 
-    def fetch_more(self, n=None, table=None):
+        if save_as:
+            self.saved_curs.update({save_as : self.cur})
+            self.cur = self.con.cursor()
+
+        return data
+
+    def fetch_more(self, n=None, raw=False, table=None, from_saved=None):
         '''Fetch more result from the last query, remembering the last output
         format.'''
-        if not n:
-            data = self.cur.fetchall()
+        if from_saved:
+            c = self.saved_curs[from_saved]
+            print 'ccc, got saved cursor called:', from_saved
         else:
-            data = self.cur.fetchmany(n)
+            c = self.cur
+        if not n:
+            data = c.fetchall()
+        else:
+            data = c.fetchmany(n)
+            print 'ccc, fetched manny:', n
+        if len(data) == 0:
+            print 'VVV, nothing in here:', data
+            return []
 
         try:
             raw = self.lastraw
         except AttributeError:
             raw = False
+
         if raw:
             return data
+        elif not table:
+            table = self.lasttable
 
-        if not table and not raw:
-            try:
-                table = self.lasttable
-            except AttributeError:
-                print '[fetch_more] Could not format data, need <table>'
-                raw = True
-        if table and not raw:
-            self.lasttable = table
-            self.lastraw = raw
+        self.lasttable = table
+        self.lastraw = raw
+        if hasattr(self, 'lastheaders'):
+            return utility.make_namedtuple_with_headers(self.lastheaders,
+                                                        table, data)
+        else:
             header_sql = OSQL.get_column_metadata_from.format(table=table)
-            return make_namedtuple_with_query(self.cur, header_sql, table, data)
+            return utility.make_namedtuple_with_query(self.con.cursor(),
+                                                      header_sql, table, data)
 
 def main():
     '''<nodoc>'''

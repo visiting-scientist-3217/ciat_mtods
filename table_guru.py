@@ -197,10 +197,10 @@ class TableGuru(utility.VerboseQuiet):
         def is_eq(ora, chad):
             for a,b in conf.iteritems():
                 try: # TODO print what fails here! ('RAICES_COMERCIALES')
-                    msg =  '[is_eq] {0}->{1} != {2}->{3} : returns {4}'
-                    print msg.format(a, getattr(ora, a), b, getattr(chad,
-                                     b.split('.')[1]), getattr(ora, a) !=
-                                     getattr(chad, b.split('.')[1]))
+                    #msg =  '[is_eq] {0}->{1} != {2}->{3} : returns {4}'
+                    #print msg.format(a, getattr(ora, a), b, getattr(chad,
+                    #                 b.split('.')[1]), getattr(ora, a) !=
+                    #                 getattr(chad, b.split('.')[1]))
                     if getattr(ora, a) != getattr(chad, b.split('.')[1]):
                         return False
                 except AttributeError:
@@ -276,13 +276,13 @@ class TableGuru(utility.VerboseQuiet):
             # of Chado entries.
             unknown = []
             for i in self.data:
-                msg = '[-] {0} {1} entry: {2}'
-                item = 'var:{0},gid:{1}'.format(getattr(i, 'VARIEDAD'),
-                                                getattr(i, 'GID'))
-                msg = msg.format('{}',tab,item)
+                #msg = '[-] {0} {1} entry: {2}'
+                #item = 'var:{0},gid:{1}'.format(getattr(i, 'VARIEDAD'),
+                #                                getattr(i, 'GID'))
+                #msg = msg.format('{}',tab,item)
                 if not is_in(i, current) and not i in unknown:
                     unknown.append(i)
-                    self.vprint('[+] adding {0}: {1}'.format(tab,item))
+                    #self.vprint('[+] adding {0}: {1}'.format(tab,item))
                 elif is_in(i, current): self.vprint(msg.format('known'))
                 elif i in unknown: self.vprint(msg.format('double'))
         else:
@@ -485,7 +485,7 @@ class TableGuru(utility.VerboseQuiet):
                     continue
                 t_name = self.__get_trait_name(k)
                 if t_name:
-                    new.update({'#'+t_name:v})
+                    new.update({t_name : v})
                 else:
                     attr_blacklist.append(k)
             descs.append(new)
@@ -495,9 +495,8 @@ class TableGuru(utility.VerboseQuiet):
                 + '\'\'\'\n{blk}\n\'\'\'\n'
             self.qprint(msg.format(tab=self.table, blk=attr_blacklist))
 
-        # Check if all phenotypes exist already as cvterm, if not, add 'em.
-        pheno_cvts = [i.lstrip('#') for i in descs[0].keys()]
-        t_cvt = self.__check_and_add_cvterms(pheno_cvts, f_ext='pre_pheno')
+        # Note: We create needed cvterms for the descriptors syncronously on
+        # Task.execution(), as their numbers are low.
 
         # Looking in the first ontology mapping and then Chado, to find the
         # genus of Cassava. ('Manihot')
@@ -507,7 +506,7 @@ class TableGuru(utility.VerboseQuiet):
 
         t_phen = self.linker.create_phenotype(stocks, descs, others=others,
                                               genus=genus)
-        return (t_cvt, t_phen)
+        return t_phen
 
     def __get_trait_name(self, trait):
         '''Using self.onto.mapping, we create and return a nice trait name.
@@ -541,40 +540,59 @@ class TableGuru(utility.VerboseQuiet):
 
         return TableGuru.TRANS[self.table]
 
-    def create_upload_tasks(self, test=None):
+    def create_upload_tasks(self, max_round_fetch=1000, test=None):
         '''Multiplexer for the single rake_{table} functions.
 
         Each create necessary workbooks for the specified table, save them and
         returns all their names in an array.
         '''
+        msg = '[create_upload_tasks] max_round_fetch={0}, test={1}'
+        self.vprint(msg.format(max_round_fetch, test))
         self.tr = self.get_translation()
+
+        if test and (test < max_round_fetch):
+            max_round_fetch = test
+        c_name = 'main_data'
         sql = OSQL.get_all_from.format(table=self.table)
         self.data = self.oracle.get_rows(sql, table=self.table,
-                                         fetchamount=test)
+                                         fetchamount=max_round_fetch,
+                                         save_as=c_name)
+        round_N = -1
+        while True:
+            round_N += 1
+            print '[+] === upload round {} ==='.format(round_N)
+            print '[+] data: {} rows'.format(len(self.data))
 
-        self.vprint('[+] data: {} rows'.format(len(self.data)))
-        self.vprint('[+] data set: {} rows'.format(len(set(self.data))))
+            t = {}
+            t.update({'stocks' : self.__check_and_add_stocks()})
+            t.update({'sites' : self.__check_and_add_sites()})
+            t.update({'contacts' : self.__check_and_add_contacts()})
+            t.update({'phenos' : self.__check_and_add_phenotypes()})
 
-        t = {}
-        t.update({'stocks' : self.__check_and_add_stocks()})
-        t.update({'sites' : self.__check_and_add_sites()})
-        t.update({'contacts' : self.__check_and_add_contacts()})
-        t.update({'phenos' : self.__check_and_add_phenotypes()})
+            # Replace None values with dummies.
+            for k,v in t.iteritems():
+                if v is None:
+                    t[k] = Task('Empty', lambda: None, [], {})
 
-        # Replace None values with dummies.
-        for k,v in t.iteritems():
-            if v is None:
-                t[k] = Task('Empty', lambda: None, [], {})
+            # the tasks variable is explained in migration.py -> __parallel_upload
+            tasks = (
+                [ t['stocks'], t['sites'], t['contacts'], ],
+                t['phenos'], 
+            )
 
-        # we are done with it
-        #del self.data
+            yield tasks
 
-        # the tasks variable is explained in migration.py -> __parallel_upload
-        tasks = (
-            [ t['stocks'], t['sites'], t['contacts'], ],
-            t['phenos'], 
-        )
-        return tasks
+            print 'xxx', test, self.oracle.cur.rowcount
+            if test:
+                if self.oracle.cur.rowcount >= test:
+                    break
+                if (test - self.oracle.cur.rowcount) < max_round_fetch:
+                    max_round_fetch = test - self.oracle.cur.rowcount
+            self.data = self.oracle.fetch_more(n=max_round_fetch,
+                                               from_saved=c_name)
+            print 'yyy', self.data[:3]
+            if not self.data:
+                break
 
 # Just fill in some empty dict()'s.
 for table in TableGuru.ALL_TABLES:
