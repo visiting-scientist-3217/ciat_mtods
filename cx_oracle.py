@@ -69,6 +69,34 @@ class Oracledb():
             self.cur = self.con.cursor()
         return self.con, self.cur
 
+    # Tried to find a bug, didn't work..
+    #@property
+    #def cur(self):
+    #    print 'XXX accessing cursor @', hex(id(self.c))
+    #    return self.c
+
+    def __check_lastheaders(self, table):
+        if not hasattr(self, 'lasttable'):
+            self.lasttable = table
+        if not hasattr(self, 'lastheaders') or (self.lasttable != table):
+            self.lasttable = table
+            header_sql = OSQL.get_column_metadata_from.format(table=table)
+            self.cur.execute(header_sql)
+            headers = [utility.normalize(i[1]) for i in self.cur.fetchall()]
+            self.lastheaders = headers
+            print 'xxx', headers
+
+    def __format(self, data, table):
+        'formats data as namedtuples'
+        self.__check_lastheaders(table)
+        if hasattr(self, 'lastheaders') and hasattr(self, 'lasttable'):
+            data = utility.make_namedtuple_with_headers(self.lastheaders,
+                                                        self.lasttable, data)
+        else: 
+            raise RuntimeError('table not found')
+        print 'XXX, formated data with:', table
+        return data
+
     def get_rows(self, sql, table=None, fetchamount=None, raw=False, save_as=None):
         '''Execute a <sql>-statement, returns a namedtuple.
         
@@ -83,13 +111,8 @@ class Oracledb():
             data = self.cur.fetchall()
 
         if table and not raw:
-            self.lasttable = table
             self.lastraw = raw
-            header_sql = OSQL.get_column_metadata_from.format(table=table)
-            self.cur.execute(header_sql)
-            headers = [utility.normalize(i[1]) for i in self.cur.fetchall()]
-            self.lastheaders = headers
-            data = utility.make_namedtuple_with_headers(headers, table, data)
+            data = self.__format(data, table)
         else:
             print '[get_rows] need table=<> to return non-raw data'
 
@@ -99,21 +122,41 @@ class Oracledb():
 
         return data
 
+    def __get_tab_from_kwargs(self, kwargs):
+        if kwargs.has_key('table'):
+            table = kwargs['table']
+        elif hasattr(self, 'lasttable'):
+            table = self.lasttable
+        else:
+            raise RuntimeError('Don\'t have table, but needed to __format()')
+        return table
+
+    def get_first_n(self, sql, n, **kwargs):
+        '''additional **kwargs will be used to sql.format(**kwargs)'''
+        sql = (sql + OSQL.first_N_only).format(N=n, **kwargs)
+        self.cur.execute(sql)
+        table = self.__get_tab_from_kwargs(kwargs)
+        return self.__format(self.cur.fetchall(), table)
+
+    def get_n_more(self, sql, n, offset=0, **kwargs):
+        '''additional **kwargs will be used to sql.format(**kwargs)'''
+        sql = (sql + OSQL.offset_O_fetch_next_N).format(N=n, O=offset, **kwargs)
+        self.cur.execute(sql)
+        table = self.__get_tab_from_kwargs(kwargs)
+        return self.__format(self.cur.fetchall(), table)
+
     def fetch_more(self, n=None, raw=False, table=None, from_saved=None):
         '''Fetch more result from the last query, remembering the last output
         format.'''
         if from_saved:
             c = self.saved_curs[from_saved]
-            print 'ccc, got saved cursor called:', from_saved
         else:
             c = self.cur
         if not n:
             data = c.fetchall()
         else:
             data = c.fetchmany(n)
-            print 'ccc, fetched manny:', n
         if len(data) == 0:
-            print 'VVV, nothing in here:', data
             return []
 
         try:

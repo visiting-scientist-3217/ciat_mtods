@@ -37,33 +37,28 @@ class Migration(utility.VerboseQuiet):
 
     BASE_DIR = ''
 
-    def __init__(self, upload=True, verbose=False, quiet=False,
-                 only_update=False, **tgargs):
+    def __init__(self, verbose=False, quiet=False, basedir=None, **tgargs):
         '''We set some configuration, connect to the database, and create a
         local cursor object.
 
         Arguments:
             verbose     print lots of debug info
             quiet       daemon mode, be silent
-            upload      create AND upload the excel files, default: true
-
-        Writable members:
-            do_upload   intended for unittesting
         '''
         super(self.__class__, self).__init__()
+        if not basedir:
+            basedir = self.BASE_DIR
+        else:
+            self.BASE_DIR = basedir
         self.VERBOSE = verbose
         self.QUIET = quiet
-        self.do_upload = upload
-        self.only_update = only_update
         self.db = cx_oracle.Oracledb()
         if self.VERBOSE: self.db.debug = True
-
         self.connection, self.cursor = self.db.connect()
         self.vprint('[+] connected')
 
         self.tg = table_guru.TableGuru('', self.db, self.VERBOSE,
-                                       basedir=self.basedir,
-                                       update=self.only_update, **tgargs)
+                                       basedir=basedir, **tgargs)
 
     def __get_tables(self):
         self.cursor.execute(utility.OracleSQLQueries.get_table_names)
@@ -81,11 +76,9 @@ class Migration(utility.VerboseQuiet):
             basedir     log file location
         '''
         if not os.path.exists(basedir):
-            raise RuntimeError('[.full] non existent path "{}"'\
-                               .format(basedir))
-        self.basedir = basedir
-        self.vprint('[+] basedir = "{0}", do_upload = {1}'.format(self.basedir,
-            self.do_upload))
+            msg = '[.full] non existent path "{}"'
+            raise RuntimeError(msg.format(basedir))
+        self.vprint('[+] basedir = "{0}"'.format(basedir))
 
         for table in self.__get_tables():
             if table in self.TABLES_MIGRATION_IMPLEMENTED:
@@ -95,6 +88,7 @@ class Migration(utility.VerboseQuiet):
         '''Migrates a single table, including upload if specified.'''
         self.vprint('[+] starting migrate({})'.format(table))
         self.tg.table = table
-        tasks = self.tg.create_upload_tasks(update=self.only_update)
-        Task.parallel_upload(tasks)
+        tasks_generator = self.tg.create_upload_tasks()
+        for suite in tasks_generator:
+            Task.parallel_upload(suite)
 

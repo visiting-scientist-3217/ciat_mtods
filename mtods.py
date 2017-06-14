@@ -38,7 +38,7 @@ def main():
     mutally_exclusive_msg = 'options {0} and {1} are mutally exclusive'
     exclusive_opts = zip(
         [[o.single_table,'-s'], [o.verbose,'-v'], [o.do_update,    '-u']], 
-        [[o.basedir,     '-b'], [o.quiet,  '-q'], [not o.do_upload,'-n']]
+        [[o.basedir,     '-b'], [o.quiet,  '-q']]
     )
     for a,b in exclusive_opts:
         if a[0] and b[0]:
@@ -61,15 +61,14 @@ def main():
     chado.PORT = o.pg_port
 
     # Here we go..
-    migra = migration.Migration(verbose=o.verbose, quiet=o.quiet)
+    migra = migration.Migration(verbose=o.verbose, quiet=o.quiet,
+                                basedir=o.basedir, chado_db=o.ch_db,
+                                chado_cv=o.ch_cv, chado_dataset=o.ch_pj)
 
     if o.basedir or not o.single_table:
-        migra.full(basedir=o.basedir, upload=o.do_upload,
-                   only_update=o.do_update, chado_db=o.ch_db, chado_cv=o.ch_cv,
-                   chado_dataset=o.ch_pj)
+        migra.full(basedir=o.basedir)
     else:
-        migra.single(o.single_table, chado_db=o.ch_db, chado_cv=o.ch_cv,
-                     chado_dataset=o.ch_pj)
+        migra.single(o.single_table)
     return 0
 
 def optparse_init():
@@ -78,9 +77,10 @@ def optparse_init():
     '''
     p = optparse.OptionParser(description=__doc__)
     p.add_option('-v', '--verbose', action='store_true', dest='verbose',
-        help='hablamelo', metavar='', default=False)
+        help='Verbose', metavar='', default=False)
     p.add_option('-q', '--quiet', action='store_true', dest='quiet',
-        help='daemon silence', metavar='', default=False)
+        help='Only print critical failure information', metavar='',
+        default=False)
     p.add_option('-r', '--drush-root', action='store', type='string',
         dest='drush_root', help='root dir of drupal installation',
         metavar='<path>', default='')
@@ -121,11 +121,6 @@ def optparse_init():
         help='that pj entry (default: mcl_pheno)', metavar='<pj>',
         default='mcl_pheno')
 
-    test = optparse.OptionGroup(p, 'Debug Options', '')
-    test.add_option('-n', '--no-upload', action='store_false', dest='do_upload',
-        help='do NOT upload the spreadsheed via drush (default: False)',
-        metavar='', default=True)
-
     # Full migration options
     full = optparse.OptionGroup(p, 'Full Migration (default)', '')
     full.add_option('-b', '--basedir', action='store', type='string',
@@ -143,7 +138,6 @@ def optparse_init():
     p.add_option_group(pch)
     p.add_option_group(full)
     p.add_option_group(single)
-    p.add_option_group(test)
     return p
 
 if __name__ == '__main__':

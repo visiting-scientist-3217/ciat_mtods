@@ -229,8 +229,8 @@ class ChadoPostgres(object):
             cond = "accession = '{}'".format(name)
             self.__delete_where('dbxref', cond)
 
-    def delete_stock(self, stock):
-        cond = "uniquename = '{}'".format(stock)
+    def delete_stock(self, stock, column='name'):
+        cond = column+" = '{}'".format(stock)
         self.__delete_where('stock', cond)
 
     def delete_geolocation(self, site='', keys={}):
@@ -479,15 +479,12 @@ class ChadoDataLinker(object):
         Pass props = [['name0', 'val0'], ['name1', 'val1'], ...]
         <ptype> is a string, that meanst one call per property
         '''
-        # get the stockprop type_id, possibly create it first
-        if not ptype:
-            raise RuntimeError('You need to specify a stockprop type.')
+        if not ptype: raise RuntimeError('no stockprop type')
         type_id = self.__get_or_create_cvterm(ptype).cvterm_id
 
-        # get stock_ids joined with the values
         stmt = '''
-            SELECT s.stock_id,s.uniquename FROM (VALUES {}) AS v
-                JOIN stock s ON s.uniquename = v.column1
+            SELECT s.stock_id,s.name FROM (VALUES {}) AS v
+                JOIN stock s ON s.name = v.column1
         '''
         values = ','.join("('{}')".format(p[0]) for p in props)
         stmt = stmt.format(values)
@@ -504,8 +501,7 @@ class ChadoDataLinker(object):
             join = zip(stocks, props)
             content = [[sck[0],type_id,prp[1]] for sck,prp in join]
             #               ^ stock_id     ^ value
-            # Only one value per stock, per stockprop (Also per rank, but we
-            # don't use rank).
+            # Yes this uniq() is necessary.
             content = uniq(content, key=lambda x: x[0])
             return content
 
@@ -524,16 +520,6 @@ class ChadoDataLinker(object):
 
     def __t1_create_stockprop(self, stocks, others, tname):
         t_stockprop = []
-
-        # -- arg.. FIXME? this is only a problem for the unittests..
-        # because the spreadsheets wanted state, we went with it, and now that
-        # bites us in the ..
-        curr_stocks = self.chado.get_stock()
-        curr_stock_names = [i.name for i in curr_stocks]
-        stocks = [i for i in stocks if i in curr_stock_names]
-        if not stocks:
-            return [Task.init_empty()]
-        # -- arg..
 
         for stockprop in self.STOCKPROPS:
             if others[0].has_key(stockprop):
@@ -621,7 +607,7 @@ class ChadoDataLinker(object):
         # -- stocks --
         values = ','.join("('{}', '{}')".format(s, g) for s,g in zip(stocks,geos))
         stock_stmt = stmt.format(result='stock_id', values=values,
-                                 join='stock', join_col='uniquename')
+                                 join='stock', join_col='name')
         cvt = self.__get_or_create_cvterm('sample')
         type_id = cvt.cvterm_id
         def join_stock_func(type_id,stmt_res):

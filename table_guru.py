@@ -276,10 +276,10 @@ class TableGuru(utility.VerboseQuiet):
             # of Chado entries.
             unknown = []
             for i in self.data:
-                #msg = '[-] {0} {1} entry: {2}'
-                #item = 'var:{0},gid:{1}'.format(getattr(i, 'VARIEDAD'),
-                #                                getattr(i, 'GID'))
-                #msg = msg.format('{}',tab,item)
+                msg = '[-] {0} {1} entry: {2}'
+                item = 'var:{0},gid:{1}'.format(getattr(i, 'VARIEDAD'),
+                                                getattr(i, 'GID'))
+                msg = msg.format('{}',tab,item)
                 if not is_in(i, current) and not i in unknown:
                     unknown.append(i)
                     #self.vprint('[+] adding {0}: {1}'.format(tab,item))
@@ -321,7 +321,9 @@ class TableGuru(utility.VerboseQuiet):
                         entry.update(
                             {ora_attr : getattr(whole_entry, ora_attr)}
                         )
-                except AttributeError:
+                except AttributeError as e:
+                    #msg = '[-] getting ."{0}" from {1} failed.\n'
+                    #print msg.format(ora_attr, whole_entry)
                     blacklist.append(ora_attr)
             # Highly unlikely, but if it happens we better tell someone.
             if skip and raw:
@@ -540,7 +542,7 @@ class TableGuru(utility.VerboseQuiet):
 
         return TableGuru.TRANS[self.table]
 
-    def create_upload_tasks(self, max_round_fetch=1000, test=None):
+    def create_upload_tasks(self, max_round_fetch=2000, test=None):
         '''Multiplexer for the single rake_{table} functions.
 
         Each create necessary workbooks for the specified table, save them and
@@ -552,16 +554,18 @@ class TableGuru(utility.VerboseQuiet):
 
         if test and (test < max_round_fetch):
             max_round_fetch = test
-        c_name = 'main_data'
-        sql = OSQL.get_all_from.format(table=self.table)
-        self.data = self.oracle.get_rows(sql, table=self.table,
-                                         fetchamount=max_round_fetch,
-                                         save_as=c_name)
+        sql = OSQL.get_all_from
+        self.data = self.oracle.get_first_n(sql, max_round_fetch,
+                                            table=self.table, ord='GID')
+
         round_N = -1
+        fetched = 0
         while True:
             round_N += 1
+            fetched_cur = len(self.data)
+            fetched += fetched_cur
             print '[+] === upload round {} ==='.format(round_N)
-            print '[+] data: {} rows'.format(len(self.data))
+            print '[+] data: {} rows'.format(fetched_cur)
 
             t = {}
             t.update({'stocks' : self.__check_and_add_stocks()})
@@ -572,25 +576,22 @@ class TableGuru(utility.VerboseQuiet):
             # Replace None values with dummies.
             for k,v in t.iteritems():
                 if v is None:
-                    t[k] = Task('Empty', lambda: None, [], {})
+                    print '[-] None-Task for {}'.format(k)
+                    t[k] = utility.Task.init_empty()
 
-            # the tasks variable is explained in migration.py -> __parallel_upload
+            # the tasks variable is explained in migration.py -> Task.parallel_upload
             tasks = (
                 [ t['stocks'], t['sites'], t['contacts'], ],
                 t['phenos'], 
             )
-
             yield tasks
 
-            print 'xxx', test, self.oracle.cur.rowcount
-            if test:
-                if self.oracle.cur.rowcount >= test:
-                    break
-                if (test - self.oracle.cur.rowcount) < max_round_fetch:
-                    max_round_fetch = test - self.oracle.cur.rowcount
-            self.data = self.oracle.fetch_more(n=max_round_fetch,
-                                               from_saved=c_name)
-            print 'yyy', self.data[:3]
+            print 'ccc', test, fetched
+            if test and fetched >= test: break
+            self.data = self.oracle.get_n_more(sql, max_round_fetch,
+                                               offset=fetched,
+                                               table=self.table,
+                                               ord='GID')
             if not self.data:
                 break
 

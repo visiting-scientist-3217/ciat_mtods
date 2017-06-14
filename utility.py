@@ -67,6 +67,15 @@ class OracleSQLQueries():
     get_all_from = '''\
         SELECT * FROM {table}\
     '''
+    first_N_only = '''
+        ORDER BY {ord}
+        FETCH FIRST {N} ROWS ONLY\
+    '''
+    offset_O_fetch_next_N = '''
+        ORDER BY {ord}
+        OFFSET {O} ROWS
+        FETCH NEXT {N} ROWS ONLY\
+    '''
 
 class PostgreSQLQueries():
     '''Namespace for format()-able PostgreSQL queries.'''
