@@ -501,8 +501,7 @@ class ChadoDataLinker(object):
             join = zip(stocks, props)
             content = [[sck[0],type_id,prp[1]] for sck,prp in join]
             #               ^ stock_id     ^ value
-            # Yes this uniq() is necessary.
-            content = uniq(content, key=lambda x: x[0])
+            content = uniq(content, key=lambda x: x[0])#necessary
             return content
 
         name = 'stockprop upload'
@@ -517,16 +516,6 @@ class ChadoDataLinker(object):
         kwargs.update(insert_kwargs)
         t = Task(name, f, *args, **kwargs)
         return [t,]
-
-    def __t1_create_stockprop(self, stocks, others, tname):
-        t_stockprop = []
-
-        for stockprop in self.STOCKPROPS:
-            if others[0].has_key(stockprop):
-                props = [[s, o[stockprop]] for s,o in zip(stocks,others)]
-                t = self.create_stockprop(props, stockprop, tname=stockprop)
-                t_stockprop.append(t)
-        return t_stockprop
 
     def __construct_rnd(self, i, v):
         a = 'abcdefghijklmnopqrstuvwxyz'
@@ -659,26 +648,21 @@ class ChadoDataLinker(object):
                  e.g.: geolocation(nd_geolocation), date's(stockprop), ..
         '''
         # === Plan of Action ===
-        # T1   - create_stockprop from <others>
-        t_stockprop = self.__t1_create_stockprop(stocks, others, tname)
-
-        # T1.X - create_X from <others>
-        #
-        # T2   - upload phenotypes from <descs>
+        # T1   - upload phenotypes from <descs>
         self.pheno_uniquenames = [] # used to later query the ids
         t_phenos = self.__t2_create_phenoes(stocks, descs, tname)
 
-        # T3   - get geolocation ids        # has already been uploaded..
-        # T3   - create_nd_experiment
+        # T2   - get geolocation ids        # has already been uploaded..
+        # T2   - create_nd_experiment
         t_experiment = self.__t3_create_experiments(others, stocks)
 
-        # T4   - get stock ids, and nd_experiment ids
-        # T4   - get phenotype ids, and nd_experiment ids
-        # T4   - link 'em
+        # T3   - get stock ids, and nd_experiment ids
+        # T3   - get phenotype ids, and nd_experiment ids
+        # T3   - link 'em
         t_link = self.__t4_link(others, stocks)
         del self.pheno_uniquenames
 
-        return ([t_stockprop, t_phenos, t_experiment], t_link)
+        return ([t_phenos, t_experiment], t_link)
 
 # META-BEGIN
 # Metaprogramming helper-function.

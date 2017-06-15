@@ -157,10 +157,10 @@ class TableGuru(utility.VerboseQuiet):
                     msg = msg.format(col, conf.get(self.table, col))
                     raise RuntimeError(msg)
 
-    def __get_config(self, chado_table=None, oracle_column=None):
+    def get_config(self, chado_table=None, oracle_column=None):
         '''Returns only the (TRANS, TRANS_C) config that match the given
         arguments.'''
-        if not self.TRANS or not self.TRANS_C:
+        if not self.TRANS or not self.TRANS_C or not hasattr(self, 'tr'):
             self.tr = self.get_translation()
 
         def fill_with_cond(cond, c=None, o=None):
@@ -184,6 +184,98 @@ class TableGuru(utility.VerboseQuiet):
 
         return tr, ctr
 
+    def create_equal_comparison(table, conf, c_conf):
+        '''Returns functions to compare oracle objects with chado objects.
+
+        Functions are created only for the given table, using the given config.
+        Return-order is:
+            is_eq, is_in, conf, c_conf
+        '''
+        f,f2 = lambda x:None, lambda x:None
+        f.__doc__ = 'is_eq(ora, chad) -> True if the oracle entry ora == chad'
+        f2.__doc__ = 'is_in(ora, c) -> True if ora is contained in iterable c'
+
+        # Origianlly we did this:
+        #def is_eq(ora, chad):
+        #    for a,b in conf.iteritems():
+        #        try: # TODO print what fails here! ('RAICES_COMERCIALES')
+        #            if getattr(ora, a) != getattr(chad, b.split('.')[1]):
+        #                return False
+        #        except AttributeError:
+        #            continue
+        #    return True
+        if table == 'stock':
+            def f(ora, chad):
+                for ora_attr, chad_attr in conf.iteritems():
+                    if 'uniquename' in chad_attr and \
+                            getattr(ora, ora_attr) != chad.uniquename:
+                        return False
+                return True
+
+        elif table == 'stockprop':
+            # TODO: We might need to update this for every round, IF AND ONLY IF
+            #       there are double stock.name entries in the oracle database.
+            if not hasattr(self, 'map_stock_name_to_id'):
+                stocks = self.chado.get_stock()
+                m = {}
+                for s in stocks: m.update({s.name : s.stock_id})
+                self.map_stock_name_to_id = m
+            if not hasattr(self, 'map_stockprop_type_to_cvterm_id'):
+                m = {}
+                sps = self.chado.get_stockprop()
+                cvts = self.chado.get_cvterm()
+                for sp in sps:
+                    spname = [i for i in cvts if i.cvterm_id == sp.type_id]
+                    assert(len(spname) == 1)
+                    spname = spname[0].name
+                    m.update({spname : sp.type_id})
+                self.map_stockprop_type_to_cvterm_id = m
+
+            def f(sp, current):
+                m_stockid = self.map_stock_name_to_id
+                m_propid = self.map_stockprop_type_to_cvterm_id
+                s,p = sp
+                s_id = m_stockid[s]
+                p_id = m_propid[s]
+                if [s_id, p_id] == current:
+                    return True
+                return False
+
+            #must be usable like: 
+            #   ids = [[i.stock_id i.type_id] for i in chado.get_stockprop()]
+            #   f([stock,prop_t], ids)
+            # -> True if stock,prop_t is already in ids
+            def f2(sp, currents):
+                m_stockid = self.map_stock_name_to_id
+                m_propid = self.map_stockprop_type_to_cvterm_id
+                s,p = sp
+                s_id = m_stockid[s]
+                p_id = m_propid[s]
+                if [s_id, p_id] in currents:
+                    return True
+                return False
+
+        elif table == 'phenotype':
+            # comparing with phenotype.value doesn't make any sense, in order
+            # to do this properly we would need to:
+            #   1. lookup attr_id->cvterm.name
+            #   2. lookup stock_id->stock.name
+            #   3. compare VARIEDAD with stock.name and attr_id with phenotype name
+            if not hasattr(self, 'map_stock_name_to_id') or \
+                    not hasattr(self, 'map_phenotype_attr_to_cvterm_id'):
+                sql = utility.PostgreSQLQuerie.select_liked_phenotype
+                sql = sql.format(select='s.stock_id,p.attr_id')
+                m1,m2 = {},{}
+                for s in stocks:
+                    m.update({s.name : s.stock_id})
+                self.map_stock_name_to_id = m1
+                self.map_phenotype_attr_to_cvterm_id = m2
+            def f(p, cur):
+                m_stockid = self.map_stock_name_to_id
+                m_attrid = self.map_phenotype_attr_to_cvterm_id
+
+        return f,f2
+
     def __get_compare_f(self, table):
         '''Using the config file, we create and return compare functions for a
         given chado table:
@@ -191,31 +283,21 @@ class TableGuru(utility.VerboseQuiet):
             is_in(oracle_item, list(chado_item[, ...]))
         '''
         # TODO use c_conf
-        conf, c_conf = self.__get_config(chado_table=table)
-        if not conf:
-            return None, None, None, None
-        def is_eq(ora, chad):
-            for a,b in conf.iteritems():
-                try: # TODO print what fails here! ('RAICES_COMERCIALES')
-                    #msg =  '[is_eq] {0}->{1} != {2}->{3} : returns {4}'
-                    #print msg.format(a, getattr(ora, a), b, getattr(chad,
-                    #                 b.split('.')[1]), getattr(ora, a) !=
-                    #                 getattr(chad, b.split('.')[1]))
-                    if getattr(ora, a) != getattr(chad, b.split('.')[1]):
-                        return False
-                except AttributeError:
-                    continue
-            return True
+        conf, c_conf = self.get_config(chado_table=table)
+        if not conf: return None, None, None, None
+
+        is_eq, override = self.create_equal_comparison(table, conf, c_conf)
         msg, fmt, j = '[equal-comp : {0}] {1}', '({0} == {1})', ','
         it = conf.iteritems()
-        msg = msg.format(table,
-                         j.join(fmt.format(i,j.split('.')[1]) for i,j in it))
-        self.vprint(msg)
+        comps = j.join(fmt.format(i,j.split('.')[1]) for i,j in it)
+        self.vprint(msg.format(table, comps))
+
         def is_in(ora, chad_list):
             for c in chad_list:
-                if is_eq(ora, c):
-                    return True
+                if is_eq(ora, c): return True
             return False
+        if override: is_in = override
+
         return is_eq, is_in, conf, c_conf
 
     def __get_needed_data(self, tab, mapping='chado', raw=False):
@@ -235,22 +317,10 @@ class TableGuru(utility.VerboseQuiet):
         unfiltered oracle table entrys.
         '''
         if not mapping in ['chado', 'oracle']:
-            msg = 'unknown <mapping> argument: {arg}, must be in {li}'
-            msg = msg.format(arg=mapping, shouldbe=['chado', 'oracle'])
-            raise RuntimeError(msg)
+            msg = 'unknown <mapping> argument: {0}, must be in {1}'
+            raise RuntimeError(msg.format(mapping, ['chado', 'oracle']))
 
-        # Get the config, and create according compare-functions.
         is_equal, is_in, trg, trg_c = self.__get_compare_f(tab)
-
-        # comparing with phenotype.value doesn't make any sense, we would need
-        # to:
-        #   1. lookup attr_id->cvterm.name
-        #   2. lookup stock_id->stock.name
-        #   3. compare VARIEDAD with stock.name and attr_id with phenotype name
-        # TODO make phenotype comparisons happen, will be performance heavy
-        if tab == 'phenotype':
-            def is_in(_, __):
-                return False
 
         if not trg and not trg_c:
             msg = '[{}] no CONFIG found => not uploading any related data'
@@ -271,6 +341,15 @@ class TableGuru(utility.VerboseQuiet):
                 raise NotImplementedError(msg.format(func_name))
             current = get_all_func()
 
+            if tab == 'stockprop':
+                current = [[i.stock_id, i.type_id] for i in current]
+            elif tab == 'phenotype':
+                # We introduce an additional blacklist of single trait names
+                # here, because we cannot drop a whole row (= stock), if only a
+                # few traits are already present.
+                for _,cha_attr in trg.iteritems():
+                    current += [[s.stock_id, ?.?] for s,? in zip(stocks, cha_attr)]
+
             # It would be nice if is_in would throw a TypeError if the first
             # argument is not a OracleDB entry or the second one is not a list
             # of Chado entries.
@@ -282,7 +361,6 @@ class TableGuru(utility.VerboseQuiet):
                 msg = msg.format('{}',tab,item)
                 if not is_in(i, current) and not i in unknown:
                     unknown.append(i)
-                    #self.vprint('[+] adding {0}: {1}'.format(tab,item))
                 elif is_in(i, current): self.vprint(msg.format('known'))
                 elif i in unknown: self.vprint(msg.format('double'))
         else:
@@ -399,17 +477,34 @@ class TableGuru(utility.VerboseQuiet):
         self.vprint('[+] stocks: {} rows'.format(len(stocks)))
 
         if stocks:
-            # Stocks might be unique tuples, BUT neither stock.name nor
-            # stock.uniquename is completely unique in our database. Thus we
-            # need to filter AGAIN..
             stock_ns = [i['stock.name'] for i in stocks]
             #stock_us = [i['stock.uniquename'] for i in stocks]
             stock_us = stock_ns
             orga = self.chado.get_organism(where="common_name = 'Cassava'")[0]
             germpl_t = GERMPLASM_TYPE # < TODO remove hardcoding   ^
-            return self.linker.create_stock(stock_ns, orga,
-                                            stock_uniqs=stock_us,
-                                            germplasm_t=germpl_t)
+            t = self.linker.create_stock(stock_ns, orga, stock_uniqs=stock_us,
+                                         germplasm_t=germpl_t)
+            return t
+                   
+                   
+
+    def __check_and_add_stockprops(self):
+        '''Tasks to upload the stockprop (stock-metadata).
+
+        This functions refers to the chado 'stockprop' table.
+        '''
+        stockprops, raw_data = self.__get_needed_data('stockprop', raw=True)
+        self.vprint('[+] stocks: {} rows'.format(len(stockprops)))
+
+        if not stockprops:
+            return None
+        t_stockprops = []
+        for ora_attr,chad_attr in self.tr.iteritems():
+            prop_t = chad_attr.lstrip('stockprop.')
+            props = [[s, getattr(o, ora_attr)] for s,o in it]
+            t = self.linker.create_stockprop(props, prop_t, tname=prop_t)
+            t_stockprops.append(t)
+        return t_stockprops
 
     def __check_and_add_sites(self):
         '''Creates MCL spreadsheets to upload the geolocation information.
@@ -462,20 +557,21 @@ class TableGuru(utility.VerboseQuiet):
         stocks = [getattr(i, tr_inv['stock.name']) for i in raw_data]
 
         others = []
-        for i in raw_data:
+        for raw_entry in raw_data:
             new = {}
-            for k,v in tr_inv.iteritems():
+            for k,ora_attr in tr_inv.iteritems():
                 if k == 'nd_geolocation.description':
-                    name = getattr(i, tr_inv['nd_geolocation.description'])
+                    name = getattr(raw_entry, tr_inv['nd_geolocation.description'])
                     new.update({'site_name' : name})
-                if 'date' in k:
-                    d = self.__tostr(getattr(i, v))
-                    if 'plant' in k:
-                        new.update({'plant_date' : d})
-                    elif 'pick' in k:
-                        new.update({'pick_date' : d})
-            if not new in others:
-                others.append(new)
+                if 'stockprop' in k:
+                    #k = k.lstrip('stockprop.')
+                    value = self.__tostr(getattr(raw_entry, ora_attr))
+                    new.update({k : value})
+                    #if 'plant' in k:
+                    #    new.update({'plant_date' : value})
+                    #elif 'pick' in k:
+                    #    new.update({'pick_date' : value})
+            others.append(new)
 
         # Get the real phenotyping data into position.
         descs = []
@@ -555,6 +651,7 @@ class TableGuru(utility.VerboseQuiet):
         if test and (test < max_round_fetch):
             max_round_fetch = test
         sql = OSQL.get_all_from
+        # TODO Is GID ordering fine for all tables?
         self.data = self.oracle.get_first_n(sql, max_round_fetch,
                                             table=self.table, ord='GID')
 
@@ -568,7 +665,9 @@ class TableGuru(utility.VerboseQuiet):
             print '[+] data: {} rows'.format(fetched_cur)
 
             t = {}
+
             t.update({'stocks' : self.__check_and_add_stocks()})
+            t.update({'stockprops' : self.__check_and_add_stockprops()})
             t.update({'sites' : self.__check_and_add_sites()})
             t.update({'contacts' : self.__check_and_add_contacts()})
             t.update({'phenos' : self.__check_and_add_phenotypes()})
@@ -582,7 +681,7 @@ class TableGuru(utility.VerboseQuiet):
             # the tasks variable is explained in migration.py -> Task.parallel_upload
             tasks = (
                 [ t['stocks'], t['sites'], t['contacts'], ],
-                t['phenos'], 
+                t['phenos'], t['stockprops']
             )
             yield tasks
 

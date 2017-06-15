@@ -36,22 +36,13 @@ class ConTest(unittest.TestCase):
 
 class PostgreTests(unittest.TestCase):
     longMessage = True
-    TEST_SQL_ALL_LINKED = '''
-        SELECT p.value,s.uniquename FROM nd_experiment AS e
-            JOIN nd_experiment_stock es
-                ON e.nd_experiment_id = es.nd_experiment_id
-            JOIN nd_experiment_phenotype ep
-                ON e.nd_experiment_id = ep.nd_experiment_id
-            JOIN phenotype p
-                ON p.phenotype_id = ep.phenotype_id
-            JOIN stock s
-                ON s.stock_id = es.stock_id
-    '''
+    tmp = utility.PostgreSQLQueries.select_liked_phenotype
+    TEST_SQL_ALL_LINKED = tmp.format(select='p.value,s.uniquename')
     # set variables used in tearDown
     @classmethod
     def setUpClass(cls):
         cls.cvts = ['abc', 'def']
-        cls.stocks = ['12 GM 2319023 z', '12 GM 2319023 lsd']
+        cls.stocks = ['12 GM 2319023 z', '12 GM 2319023 lsd', '12 GM 2319023 AAlsd']
         cls.sites = [
                 {'nd_geolocation.description' : 'asdfAA',
                  'nd_geolocation.altitude'    : '1',
@@ -89,24 +80,29 @@ class PostgreTests(unittest.TestCase):
  
     # remove all the things
     # sadly we cannot: ConTest.chadodb.con.rollback()
-    @classmethod
-    def tearDownClass(cls):
+    #@classmethod
+    #def tearDownClass(cls):
+    def tearDown(self):
         # get a new cursor in case something went wrong
         ConTest.chadodb.con.commit()
         ConTest.chadodb.c = ConTest.chadodb.con.cursor()
-        for c in cls.cvts:
+        for c in self.cvts:
             ConTest.chadodb.delete_cvterm(c, cv=ConTest.linker.cv,
                                           and_dbxref=True)
-        for s in cls.stocks:
+        for s in self.stocks:
             ConTest.chadodb.delete_stock(s)
-        for g in cls.sites_clean:
+        for g in self.sites_clean:
             ConTest.chadodb.delete_geolocation(keys=g)
-        for sps in cls.props:
-            ConTest.chadodb.delete_stockprop(val=sps[1], type=cls.props_type)
-        for p in cls.pheno_args[1]:
+        for sps in self.props:
+            ConTest.chadodb.delete_stockprop(val=sps[1], type=self.props_type)
+        for p in self.pheno_args[1]:
             ConTest.chadodb.delete_phenotype(keyval=p, del_attr=True)
-        for spp in cls.pheno_kwargs['others']:
+        for spp in self.pheno_kwargs['others']:
             ConTest.chadodb.delete_stockprop(keyval=spp)
+
+        if hasattr(self, 'oracle'):
+            self.oracle.get_first_n = self.ora_f1_backup
+            self.oracle.get_n_more = self.ora_f2_backup
 
     def test_organism_funcs(self):
         genus = 'test_genus'
@@ -118,6 +114,29 @@ class PostgreTests(unittest.TestCase):
         self.assertFalse(ConTest.chadodb.has_species(species))
         self.assertFalse(ConTest.chadodb.has_genus(genus))
 
+    def data_first_n(self):
+        return self.tableguru_data[0]
+    def data_next_n(self):
+        if not hasattr(self, 'i'): self.i = 0
+        if i < len(self.tableguru_data)-1: return self.tableguru_data[self.i]
+
+    def test_table_guru_with_preset_data(self):
+        self.oracle = ConTest.oracledb
+        # we override these functions, so the table_guru will gets its data
+        # from us, and not from the oracledb
+        self.ora_f1_backup = self.oracle.get_first_n
+        self.ora_f2_backup = self.oracle.get_n_more
+        self.oracle.get_first_n = lambda *a,**kw: self.data_first_n()
+        self.oracle.get_n_more = lambda *a,**kw: self.data_next_n()
+
+       #self.assertTrue(False, 'This test is not implemented yet')
+       #self.t1 = migration.Migration.TABLES_MIGRATION_IMPLEMENTED[0]
+       #self.tg = table_guru.TableGuru(self.t1, self.oracle, basedir=PATH,
+       #                               update=True, verbose=True)
+       #taskgen = self.tg.create_upload_tasks()
+       #for tasksuite in taskgen:
+       #    tasksuite.execute()
+
     #def test_cvterm_tasks(self):
     def test_all_tasks_cuz_spreadsheets_wanted_state(self):
         ts = ConTest.linker.create_cvterm(self.cvts)
@@ -126,7 +145,7 @@ class PostgreTests(unittest.TestCase):
             t.execute()
         post_len = len(ConTest.chadodb.get_cvterm())
         msg = 'creation of cvterms failed'
-        self.assertEqual(pre_len + 2, post_len, msg)
+        self.assertEqual(pre_len + len(self.cvts), post_len, msg)
         cvterms = [i.name for i in ConTest.chadodb.get_cvterm()]
         self.assertIn(self.cvts[0], cvterms, msg)
         self.assertIn(self.cvts[1], cvterms, msg)
@@ -144,7 +163,7 @@ class PostgreTests(unittest.TestCase):
             t.execute()
         post_len = len(ConTest.chadodb.get_stock())
         msg = 'creation of stocks failed'
-        self.assertEqual(pre_len + 2, post_len, msg)
+        self.assertEqual(pre_len + len(self.stocks), post_len, msg)
         stocks = [i.uniquename for i in ConTest.chadodb.get_stock()]
         self.assertIn(self.stocks[0], stocks, msg)
         self.assertIn(self.stocks[1], stocks, msg)
@@ -156,9 +175,9 @@ class PostgreTests(unittest.TestCase):
             t.execute()
         post_len = len(ConTest.chadodb.get_nd_geolocation())
         msg = 'creation of geolocations failed'
-        self.assertGreaterEqual(pre_len + 2, post_len, msg)
+        self.assertGreaterEqual(pre_len + len(self.sites), post_len, msg)
         msg = 'equal comparison of geolocations failed'
-        self.assertEqual(pre_len + 2, post_len, msg)
+        self.assertEqual(pre_len + len(self.sites), post_len, msg)
         sts = [i.description for i in ConTest.chadodb.get_nd_geolocation()]
         self.assertIn(self.sites[0]['nd_geolocation.description'], sts, msg)
         self.assertIn(self.sites[1]['nd_geolocation.description'], sts, msg)
@@ -171,7 +190,7 @@ class PostgreTests(unittest.TestCase):
         vals = ','.join("'"+s+"'" for s in self.stocks)
         where = "uniquename = ANY(ARRAY[{}])".format(vals)
         stocks = ConTest.chadodb.get_stock(where=where)
-        if not len(stocks) == 2:
+        if not len(stocks) == len(self.stocks):
             msg = 'Cannot execute stockprop test, as stock test failed'
             raise RuntimeError(msg)
         ts = ConTest.linker.create_stockprop(self.props, self.props_type)
@@ -180,7 +199,7 @@ class PostgreTests(unittest.TestCase):
             t.execute()
         post_len = len(ConTest.chadodb.get_stockprop())
         msg = 'stockprop creation failed'
-        self.assertEqual(pre_len + 2, post_len, msg)
+        self.assertEqual(pre_len + len(self.props), post_len, msg)
         stockprops = ConTest.chadodb.get_stockprop()
         a = [i for i in stockprops if i.value == self.props[0][1]]
         b = [i for i in stockprops if i.value == self.props[1][1]]
@@ -201,6 +220,10 @@ class PostgreTests(unittest.TestCase):
     #def test_phenotype_tasks(self):
         ts = ConTest.linker.create_phenotype(*self.pheno_args,
                                              **self.pheno_kwargs)
+        nphenoes = len(self.pheno_args[1])
+        for p in self.pheno_args[1]:
+            if type(p) == dict:
+                nphenoes += len(p) - 1
         print '\n=== Tasks Start (small test suite) ==='
         utility.Task.print_tasks(ts)
         print '=== Tasks End (small test suite) ==='
@@ -208,7 +231,7 @@ class PostgreTests(unittest.TestCase):
         utility.Task.parallel_upload(ts)
         post_len = len(ConTest.chadodb.get_phenotype())
         msg = 'creation of phenotypes failed'
-        self.assertGreaterEqual(post_len, pre_len + 3, msg)
+        self.assertGreaterEqual(post_len, pre_len + nphenoes, msg)
         
         # check if we linked all the things correctly
         sql = self.TEST_SQL_ALL_LINKED
@@ -241,8 +264,9 @@ class BigTest(unittest.TestCase):
     # Append my msg to default msg.
     longMessage = True 
 
-    # Number of lines imported, this should directly correlate to the added
-    # rows of phenotyping data in chado. If 'None' all data will be used.
+    # Number of lines imported, this times the number of understood traits
+    # should directly correlate to the added rows of phenotyping data in chado.
+    # If 'None' all data will be imported.
     NTEST = 5000
 
     def step10_stateful_setup(self):

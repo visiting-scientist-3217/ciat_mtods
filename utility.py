@@ -99,6 +99,18 @@ class PostgreSQLQueries():
             FROM information_schema.columns
             WHERE table_name='{table}'\
     '''
+    select_linked_phenotype = '''\
+        SELECT {select} FROM nd_experiment AS e
+            JOIN nd_experiment_stock es
+                ON e.nd_experiment_id = es.nd_experiment_id
+            JOIN nd_experiment_phenotype ep
+                ON e.nd_experiment_id = ep.nd_experiment_id
+            JOIN phenotype p
+                ON p.phenotype_id = ep.phenotype_id
+            JOIN stock s
+                ON s.stock_id = es.stock_id\
+    '''
+
 
 
 class VerboseQuiet(object):
