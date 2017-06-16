@@ -107,10 +107,11 @@ class PostgreSQLQueries():
                 ON e.nd_experiment_id = ep.nd_experiment_id
             JOIN phenotype p
                 ON p.phenotype_id = ep.phenotype_id
+            JOIN cvterm c
+                ON c.cvterm_id = p.attr_id
             JOIN stock s
                 ON s.stock_id = es.stock_id\
     '''
-
 
 
 class VerboseQuiet(object):

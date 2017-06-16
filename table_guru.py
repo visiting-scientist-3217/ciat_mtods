@@ -184,32 +184,25 @@ class TableGuru(utility.VerboseQuiet):
 
         return tr, ctr
 
-    def create_equal_comparison(table, conf, c_conf):
+    def create_equal_comparison(self, table, conf, c_conf):
         '''Returns functions to compare oracle objects with chado objects.
 
         Functions are created only for the given table, using the given config.
         Return-order is:
             is_eq, is_in, conf, c_conf
         '''
-        f,f2 = lambda x:None, lambda x:None
-        f.__doc__ = 'is_eq(ora, chad) -> True if the oracle entry ora == chad'
-        f2.__doc__ = 'is_in(ora, c) -> True if ora is contained in iterable c'
+        f,f2 = None,None
 
-        # Origianlly we did this:
-        #def is_eq(ora, chad):
-        #    for a,b in conf.iteritems():
-        #        try: # TODO print what fails here! ('RAICES_COMERCIALES')
-        #            if getattr(ora, a) != getattr(chad, b.split('.')[1]):
-        #                return False
-        #        except AttributeError:
-        #            continue
-        #    return True
         if table == 'stock':
             def f(ora, chad):
+                compared_something = False
                 for ora_attr, chad_attr in conf.iteritems():
-                    if 'uniquename' in chad_attr and \
+                    if 'stock.name' in chad_attr and \
                             getattr(ora, ora_attr) != chad.uniquename:
                         return False
+                    if 'stock.name' in chad_attr: compared_something = True
+                if not compared_something:
+                    raise Warning('[stock] compared nothing')
                 return True
 
         elif table == 'stockprop':
@@ -235,20 +228,27 @@ class TableGuru(utility.VerboseQuiet):
                 m_stockid = self.map_stock_name_to_id
                 m_propid = self.map_stockprop_type_to_cvterm_id
                 s,p = sp
+                if not m_stockid.has_key(s) or not m_propid.has_key(p):
+                    return False
                 s_id = m_stockid[s]
-                p_id = m_propid[s]
+                p_id = m_propid[p]
                 if [s_id, p_id] == current:
                     return True
                 return False
 
-            #must be usable like: 
-            #   ids = [[i.stock_id i.type_id] for i in chado.get_stockprop()]
-            #   f([stock,prop_t], ids)
-            # -> True if stock,prop_t is already in ids
             def f2(sp, currents):
+                '''is_in([stock.name, property], [[id1,typ1],[..],..])
+
+                Must be usable like: 
+                    ids = [[i.stock_id i.type_id] for i in chado.get_stockprop()]
+                    f([stock,prop_t], ids)
+                        -> True if stock,prop_t is already in ids
+                '''
                 m_stockid = self.map_stock_name_to_id
                 m_propid = self.map_stockprop_type_to_cvterm_id
                 s,p = sp
+                if not m_stockid.has_key(s) or not m_propid.has_key(p):
+                    return False
                 s_id = m_stockid[s]
                 p_id = m_propid[s]
                 if [s_id, p_id] in currents:
@@ -263,16 +263,51 @@ class TableGuru(utility.VerboseQuiet):
             #   3. compare VARIEDAD with stock.name and attr_id with phenotype name
             if not hasattr(self, 'map_stock_name_to_id') or \
                     not hasattr(self, 'map_phenotype_attr_to_cvterm_id'):
-                sql = utility.PostgreSQLQuerie.select_liked_phenotype
-                sql = sql.format(select='s.stock_id,p.attr_id')
+                sql = utility.PostgreSQLQueries.select_linked_phenotype
+                sql = sql.format(select='s.stock_id,s.name,p.attr_id,c.name')
+                self.chado.c.execute(sql)
+                res = self.chado.c.fetchall()
                 m1,m2 = {},{}
-                for s in stocks:
-                    m.update({s.name : s.stock_id})
+                for s_id,s_name, p_attrid,cvt_name in res:
+                    m1.update({s_name : s_id})
+                    m2.update({cvt_name : p_attrid})
                 self.map_stock_name_to_id = m1
                 self.map_phenotype_attr_to_cvterm_id = m2
             def f(p, cur):
                 m_stockid = self.map_stock_name_to_id
                 m_attrid = self.map_phenotype_attr_to_cvterm_id
+                stock,attr = p
+                if not m_stockid.has_key(stock) or not m_attrid.has_key(attr):
+                    return False
+                s_id = m_stockid[stock]
+                a_id = m_attrid[attr]
+                if [s_id, a_id] == cur: return True
+                return False
+            def f2(p, cur):
+                m_stockid = self.map_stock_name_to_id
+                m_attrid = self.map_phenotype_attr_to_cvterm_id
+                stock,attr = p
+                if not m_stockid.has_key(stock) or not m_attrid.has_key(attr):
+                    return False
+                s_id = m_stockid[stock]
+                a_id = m_attrid[attr]
+                if [s_id, a_id] in cur: return True
+                return False
+
+        else:
+            # Origianlly we did only this:
+            def f(ora, chad):
+                for a,b in conf.iteritems():
+                    try: # TODO[5] print what fails here! ('RAICES_COMERCIALES')
+                        if getattr(ora, a) != getattr(chad, b.split('.')[1]):
+                            return False
+                    except AttributeError:
+                        continue
+                return True
+
+        f.__doc__ = 'is_eq(ora, chad) -> True if the oracle entry ora == chad'
+        f2_doc = 'is_in(ora, c) -> True if ora is contained in iterable c'
+        if f2: f2.__doc__ = f2_doc
 
         return f,f2
 
@@ -282,7 +317,7 @@ class TableGuru(utility.VerboseQuiet):
             is_equal(oracle_item, chado_item)
             is_in(oracle_item, list(chado_item[, ...]))
         '''
-        # TODO use c_conf
+        # TODO[6] use c_conf
         conf, c_conf = self.get_config(chado_table=table)
         if not conf: return None, None, None, None
 
@@ -341,28 +376,63 @@ class TableGuru(utility.VerboseQuiet):
                 raise NotImplementedError(msg.format(func_name))
             current = get_all_func()
 
+            # To specialize compare functions, we might need some special formats.
+            curr_overwrite = current
+            data_overwrite = self.data
+            tr_inv = utility.invert_dict(self.tr)
+
+            # We introduce an additional blacklist of single trait names here,
+            # because we cannot drop a whole row (= stock), if only a few
+            # traits are already present.
+            trait_blacklist = None
+
             if tab == 'stockprop':
-                current = [[i.stock_id, i.type_id] for i in current]
+                curr_overwrite = [[i.stock_id, i.type_id] for i in current]
+                data_overwrite = []
+                for attr in dir(self.data):
+                    if 'stockprop.' in attr:
+                        for d in self.data:
+                            data_overwrite.append(
+                                [getattr(i, tr_inv['stock.name']),
+                                 getattr(i, attr)]
+                            )
             elif tab == 'phenotype':
-                # We introduce an additional blacklist of single trait names
-                # here, because we cannot drop a whole row (= stock), if only a
-                # few traits are already present.
-                for _,cha_attr in trg.iteritems():
-                    current += [[s.stock_id, ?.?] for s,? in zip(stocks, cha_attr)]
+                # We have to execute this complex SQL-Query because neither
+                # stock.name nor stock.stock_id is directly linked to the
+                # phenotype.
+                curr_overwrite = []
+                sql = utility.PostgreSQLQueries.select_linked_phenotype
+                sql = sql.format(select='s.stock_id,c.cvterm_id')
+                print 'XXX', sql
+                self.chado.c.execute(sql)
+                print 'XXX', 'DONE'
+                res = self.chado.c.fetchall()
+                for stock_id,attr_id in res:
+                    curr_overwrite.append([stock_id, attr_id])
+                data_overwrite = []
+                for ora_attr,cha_attr in trg.iteritems():
+                    if not 'phenotype' in cha_attr: continue
+                    for d in self.data:
+                        t = self.__get_trait_name(ora_attr)
+                        if not t: break
+                        data_overwrite.append(
+                            [getattr(d, tr_inv['stock.name']), t]
+                        )
 
             # It would be nice if is_in would throw a TypeError if the first
             # argument is not a OracleDB entry or the second one is not a list
             # of Chado entries.
             unknown = []
-            for i in self.data:
+            for entry,entry_ovrw in zip(self.data, data_overwrite):
                 msg = '[-] {0} {1} entry: {2}'
-                item = 'var:{0},gid:{1}'.format(getattr(i, 'VARIEDAD'),
-                                                getattr(i, 'GID'))
+                item = 'var:{0},gid:{1}'.format(entry.VARIEDAD, entry.GID)
                 msg = msg.format('{}',tab,item)
-                if not is_in(i, current) and not i in unknown:
-                    unknown.append(i)
-                elif is_in(i, current): self.vprint(msg.format('known'))
-                elif i in unknown: self.vprint(msg.format('double'))
+                # curr_overwrite is only used for comparison, not actually
+                # appended to unknown
+                if not is_in(entry_ovrw, curr_overwrite) and not entry in unknown:
+                    unknown.append(entry)
+                elif is_in(entry_ovrw, curr_overwrite): self.vprint(msg.format('known'))
+                elif entry in unknown: self.vprint(msg.format('double'))
         else:
             unknown = self.data
 
@@ -638,7 +708,7 @@ class TableGuru(utility.VerboseQuiet):
 
         return TableGuru.TRANS[self.table]
 
-    def create_upload_tasks(self, max_round_fetch=2000, test=None):
+    def create_upload_tasks(self, max_round_fetch=1000, test=None):
         '''Multiplexer for the single rake_{table} functions.
 
         Each create necessary workbooks for the specified table, save them and

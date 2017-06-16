@@ -36,7 +36,7 @@ class ConTest(unittest.TestCase):
 
 class PostgreTests(unittest.TestCase):
     longMessage = True
-    tmp = utility.PostgreSQLQueries.select_liked_phenotype
+    tmp = utility.PostgreSQLQueries.select_linked_phenotype
     TEST_SQL_ALL_LINKED = tmp.format(select='p.value,s.uniquename')
     # set variables used in tearDown
     @classmethod
@@ -259,7 +259,7 @@ class OracleTests(unittest.TestCase):
 
 class BigTest(unittest.TestCase):
     '''Monolitic tests, building up some state.'''
-    enableThisMonoliticTestWithLongDuration = False
+    enableThisMonoliticTestWithLongDuration = True
 
     # Append my msg to default msg.
     longMessage = True 
@@ -267,7 +267,7 @@ class BigTest(unittest.TestCase):
     # Number of lines imported, this times the number of understood traits
     # should directly correlate to the added rows of phenotyping data in chado.
     # If 'None' all data will be imported.
-    NTEST = 5000
+    NTEST = 1500
 
     def step10_stateful_setup(self):
         self.done_pg_backup = False
@@ -276,7 +276,7 @@ class BigTest(unittest.TestCase):
         self.oracle = ConTest.oracledb
         self.t1 = migration.Migration.TABLES_MIGRATION_IMPLEMENTED[0]
         self.tg = table_guru.TableGuru(self.t1, self.oracle, basedir=PATH,
-                                       update=True, verbose=False)
+                                       update=True, verbose=True)
         self.pgr = PGR()
         self.n_phenos0 = self.__get_pheno_count()
 
