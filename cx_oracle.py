@@ -178,6 +178,11 @@ class Oracledb():
             header_sql = OSQL.get_column_metadata_from.format(table=table)
             return utility.make_namedtuple_with_query(self.con.cursor(),
                                                       header_sql, table, data)
+    def check_duplicates(self, table, column):
+        cond = 't.{0} = t1.{0} )'.format(column)
+        sql = (OSQL.get_all_from_uniq + cond).format(table=table)
+        self.cur.execute(sql)
+        return len(self.cur.fetchall)
 
 def main():
     '''<nodoc>'''
@@ -194,7 +199,7 @@ def main():
         print '[+] executing : "{}"'.format(sql)
         c.execute(sql)
         con.commit()
-        print '[+] Exito, mirame imprimido row[:15] -> '
+        print '[+] Exito, mirame imprimiendo row[:15] -> '
         # Print nicely formatted example values.
         for name, value in zip(c.description[:16], c.fetchone()[:16]):
             print '{0:18} : {1}'.format( name[0], value )

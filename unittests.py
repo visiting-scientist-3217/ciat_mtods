@@ -37,7 +37,7 @@ class ConTest(unittest.TestCase):
 class PostgreTests(unittest.TestCase):
     longMessage = True
     tmp = utility.PostgreSQLQueries.select_linked_phenotype
-    TEST_SQL_ALL_LINKED = tmp.format(select='p.value,s.uniquename')
+    TEST_SQL_ALL_LINKED = tmp.format(select='p.value,s.uniquename,p.uniquename')
     # set variables used in tearDown
     @classmethod
     def setUpClass(cls):
@@ -64,13 +64,17 @@ class PostgreTests(unittest.TestCase):
                  'nd_geolocation.longitude'   : '87'},
             ]
         cls.pheno_args = [
+                ['GY200922', 'GY200923', 'GY200924'], #uniq
                 cls.stocks,
                 [{'some_property' : 777134, 'another_prop' : 'ok well done'},
-                 {'some_property' : 777134}]
+                 {'some_property' : 777134},
+                 {'some_property' : 977134},
+                ]
             ]
         cls.pheno_kwargs = {
                 'others' : [{'pick_date': 12, 'plant_date' : 13},
-                            {'pick_date': 21, 'plant_date' : 31}]
+                            {'pick_date': 21, 'plant_date' : 31},
+                           ]
             }
         cls.props = [
                 [cls.stocks[0], 'Avaluuea',],
@@ -95,8 +99,11 @@ class PostgreTests(unittest.TestCase):
             ConTest.chadodb.delete_geolocation(keys=g)
         for sps in self.props:
             ConTest.chadodb.delete_stockprop(val=sps[1], type=self.props_type)
-        for p in self.pheno_args[1]:
-            ConTest.chadodb.delete_phenotype(keyval=p, del_attr=True)
+        for descs,id in zip(self.pheno_args[2], self.pheno_args[0]):
+            for trait in descs.keys():
+                p = chado.ChadoDataLinker.make_pheno_unique(id, trait)
+                ConTest.chadodb.delete_phenotype(uniquename=p, del_attr=True,
+                                                 del_nd_exp=True)
         for spp in self.pheno_kwargs['others']:
             ConTest.chadodb.delete_stockprop(keyval=spp)
 
@@ -165,8 +172,8 @@ class PostgreTests(unittest.TestCase):
         msg = 'creation of stocks failed'
         self.assertEqual(pre_len + len(self.stocks), post_len, msg)
         stocks = [i.uniquename for i in ConTest.chadodb.get_stock()]
-        self.assertIn(self.stocks[0], stocks, msg)
-        self.assertIn(self.stocks[1], stocks, msg)
+        for s in self.stocks:
+            self.assertIn(s, stocks, msg)
 
     #def test_geolocation_tasks(self):
         ts = ConTest.linker.create_geolocation(self.sites)
@@ -220,13 +227,12 @@ class PostgreTests(unittest.TestCase):
     #def test_phenotype_tasks(self):
         ts = ConTest.linker.create_phenotype(*self.pheno_args,
                                              **self.pheno_kwargs)
-        nphenoes = len(self.pheno_args[1])
-        for p in self.pheno_args[1]:
+        nphenoes = len(self.pheno_args[2])
+        for p in self.pheno_args[2]:
             if type(p) == dict:
                 nphenoes += len(p) - 1
         print '\n=== Tasks Start (small test suite) ==='
         utility.Task.print_tasks(ts)
-        print '=== Tasks End (small test suite) ==='
         pre_len = len(ConTest.chadodb.get_phenotype())
         utility.Task.parallel_upload(ts)
         post_len = len(ConTest.chadodb.get_phenotype())
@@ -237,11 +243,16 @@ class PostgreTests(unittest.TestCase):
         sql = self.TEST_SQL_ALL_LINKED
         ConTest.chadodb.c.execute(sql)
         r = ConTest.chadodb.c.fetchall()
-        phenoes = [i[0] for i in r]
-        stocks = [i[1] for i in r]
-        self.assertIn(self.stocks[0], stocks)
-        self.assertIn(self.stocks[1], stocks)
-        for ps in self.pheno_args[1]:
+        phenoes = set(i[0] for i in r)
+        pheno_uniqenames = set(i[2] for i in r)
+        stocks = set(i[1] for i in r)
+        for s in self.stocks:
+            self.assertIn(s, stocks)
+        for descs,id in zip(self.pheno_args[2], self.pheno_args[0]):
+            for trait in descs.keys():
+                uniquename = chado.ChadoDataLinker.make_pheno_unique(id, trait)
+                self.assertIn(uniquename, pheno_uniqenames)
+        for ps in self.pheno_args[2]:
             for v in ps.values():
                 self.assertIn(str(v), phenoes)
 
@@ -259,7 +270,7 @@ class OracleTests(unittest.TestCase):
 
 class BigTest(unittest.TestCase):
     '''Monolitic tests, building up some state.'''
-    enableThisMonoliticTestWithLongDuration = True
+    enableThisMonoliticTestWithLongDuration = False
 
     # Append my msg to default msg.
     longMessage = True 
@@ -267,7 +278,7 @@ class BigTest(unittest.TestCase):
     # Number of lines imported, this times the number of understood traits
     # should directly correlate to the added rows of phenotyping data in chado.
     # If 'None' all data will be imported.
-    NTEST = 1500
+    NTEST = 700
 
     def step10_stateful_setup(self):
         self.done_pg_backup = False
@@ -300,13 +311,7 @@ class BigTest(unittest.TestCase):
         if not self.need_rollback:
             print '[-] cannot do inside tests, as no data was uploaded'
             return
-        sql = PostgreTests.TEST_SQL_ALL_LINKED
-        ConTest.chadodb.c.execute(sql)
-        r = ConTest.chadodb.c.fetchall()
-        phenoes = [i[0] for i in r]
-        stocks = [i[1] for i in r]
-        self.assertFalse(not stocks)
-        self.assertFalse(not phenoes)
+        # ...
 
     def step90_stateful_teardown(self):
         if self.need_rollback:

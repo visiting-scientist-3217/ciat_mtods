@@ -67,6 +67,12 @@ class OracleSQLQueries():
     get_all_from = '''\
         SELECT * FROM {table}\
     '''
+    get_all_from_uniq = '''\
+        SELECT * FROM {table} t
+        WHERE NOT EXISTS (
+            SELECT null FROM {table} t1
+            WHERE 
+    '''
     first_N_only = '''
         ORDER BY {ord}
         FETCH FIRST {N} ROWS ONLY\
@@ -169,7 +175,7 @@ class Task(VerboseQuiet):
 
     @staticmethod
     def init_empty():
-        '''Does nothing when executed.'''
+        '''Returns a Task that does nothing when executed.'''
         return Task('Empty', lambda args,kwargs: None, [], {})
 
     @staticmethod
@@ -206,8 +212,8 @@ class Task(VerboseQuiet):
                 Task.parallel_upload(t)
         elif type(tasks) == list:
             ts = []
-            for t in tasks:
-                t = threading.Thread(target=Task.parallel_upload, args=[t])
+            for task in tasks:
+                t = threading.Thread(target=Task.parallel_upload, args=[task])
                 ts.append(t)
             map(lambda x: x.start(), ts)
             map(lambda x: x.join(), ts)

@@ -161,9 +161,6 @@ class ChadoPostgres(object):
         c.execute(fetch_stmt)
         fetch_res = c.fetchall()
 
-        #print '[fetch_y_insert_into] stmt:\n\t{}'.format(fetch_stmt[:200])
-        #print '\tres: {}'.format(str(fetch_res)[:60]+'...')
-
         args = list(insert_args)
         # replaces values with the constructed join'ed ones
         args[1] = values_constructor(insert_args[1], fetch_res)
@@ -260,6 +257,7 @@ class ChadoPostgres(object):
             keyval = {a:b}
             keyvals = [{a:b}, {c:d}, ..]
         '''
+        if not any([val,type,keyval]): return
         if val and type:
             keyvals = [{type : val}]
         elif val or type:
@@ -292,9 +290,11 @@ class ChadoPostgres(object):
         cond = ' OR '.join(conds)
         self.__delete_where('stockprop', cond)
 
-    def delete_phenotype(self, keyval=None, keyvals=None, del_attr=False):
+    def delete_phenotype(self, uniquename=None, keyval=None, keyvals=None,
+                         del_attr=False, del_nd_exp=False):
         '''Deletes all phenotypes, with given descriptors/values.
         
+        if <uniquename> is given we delete exactly that phenotype
         if <del_attr> is True, we also delete the type of the phenotype (the
         cvterm).
             keyval = {a:b}
@@ -305,16 +305,46 @@ class ChadoPostgres(object):
                 keyvals.append(keyval)
             else:
                 keyvals = [keyval]
-        conds = []
-        for kv in keyvals:
-            k,v = next(kv.iteritems())
-            t = self.get_cvterm(where="name = '{}'".format(k))
-            if not t: return
-            cond = "(attr_id = {}".format(t[0].cvterm_id)
-            cond = cond + " AND value = '{}')".format(v)
-            conds.append(cond)
-        cond = ' OR '.join(conds)
+            conds = []
+            for kv in keyvals:
+                k,v = next(kv.iteritems())
+                t = self.get_cvterm(where="name = '{}'".format(k))
+                if not t: return
+                cond = "(attr_id = {}".format(t[0].cvterm_id)
+                cond = cond + " AND value = '{}')".format(v)
+                conds.append(cond)
+            cond = ' OR '.join(conds)
+        elif uniquename:
+            cond = "uniquename = '{}'".format(uniquename)
+
+        pheno = self.get_phenotype(where=cond)
+        nphenoes = len(pheno)
+        msg = 'ambiguous deletion: {}'
+        if nphenoes > 1: raise RuntimeError(msg.format(nphenoes))
+        if nphenoes == 0: return
+        pheno = pheno[0]
+
+        if del_attr:
+            attr_cond = "cvterm_id = {}".format(pheno.attr_id)
+            attr = self.get_cvterm(where=attr_cond)
+        if del_nd_exp: self.delete_nd_experiment(phenotype=pheno)
         self.__delete_where('phenotype', cond)
+
+    def delete_nd_experiment(self, phenotype=None, stock=None):
+        if phenotype:
+            sql = '''
+                SELECT e.nd_experiment_id FROM nd_experiment AS e
+                    JOIN nd_experiment_phenotype ep
+                        ON e.nd_experiment_id = ep.nd_experiment_id
+                    WHERE ep.phenotype_id = {}
+            '''.format(phenotype.phenotype_id)
+            r = self.__exe(sql)
+            if len(r) == 0: return
+            exp_id = r[0][0]
+            cond = "nd_experiment_id = {}".format(exp_id)
+        elif stock:
+            raise NotImplementedError('use phenotype')
+        self.__delete_where('nd_experiment', cond)
 
 class ChadoDataLinker(object):
     '''Links large list()s of data, ready for upload into Chado.
@@ -517,26 +547,22 @@ class ChadoDataLinker(object):
         t = Task(name, f, *args, **kwargs)
         return [t,]
 
-    def __construct_rnd(self, i, v):
-        a = 'abcdefghijklmnopqrstuvwxyz'
-        abc = a + a.upper()
-        l = [i for i in abc]
-        random.shuffle(l)
-        s = '{0}_{1}_{2}'
-        return s.format(i,v,''.join(l))
+    @staticmethod
+    def make_pheno_unique(id, name):
+        s = '{0}_{1}'
+        return s.format(id, name)
 
-    def __t2_create_phenoes(self, stocks, descs, tname=None):
+    def __t2_create_phenoes(self, ids, descs, tname=None):
         content = []
         attr_ids = {}
-        for d,s in zip(descs, stocks):
+        for id,d in zip(ids, descs):
             for descriptor, value in d.iteritems():
                 if not attr_ids.has_key(descriptor):
                     # We create cvterm syncronously, as their numbers are low.
                     new = self.__get_or_create_cvterm(descriptor).cvterm_id
                     attr_ids.update({descriptor : new})
                 attr_id = attr_ids[descriptor]
-                uniq = self.__construct_rnd(attr_id, value)
-                # we need to query these later to obtain the phenotype_id
+                uniq = self.make_pheno_unique(id, descriptor)
                 self.pheno_uniquenames.append(uniq)
                 if value is None: value = ''
                 content.append([uniq, attr_id, value])
@@ -592,6 +618,9 @@ class ChadoDataLinker(object):
                 JOIN nd_experiment e ON g.nd_geolocation_id = e.nd_geolocation_id
         '''
         geos = self.__get_geo_names(others)
+        # need same length, otherwise following zip() will skip stocks!
+        while len(geos) < len(stocks):
+            geos.append('Not Available')
 
         # -- stocks --
         values = ','.join("('{}', '{}')".format(s, g) for s,g in zip(stocks,geos))
@@ -615,6 +644,9 @@ class ChadoDataLinker(object):
         linkers.append(Task(name, f, *args, **kwargs))
 
         # -- phenotypes --
+        # Same here, if unequal, we skip data..
+        while len(geos) < len(self.pheno_uniquenames):
+            geos.append('Not Available')
         it = zip(self.pheno_uniquenames, geos)
         values = ','.join("('{}', '{}')".format(p, g) for p,g in it)
         pheno_stmt = stmt.format(result='phenotype_id', values=values,
@@ -637,7 +669,7 @@ class ChadoDataLinker(object):
 
     # FIXME: missleading name, we do so much more than just create phenotypeing
     #        entries..
-    def create_phenotype(self, stocks, descs, others=[], genus=None,
+    def create_phenotype(self, ids, stocks, descs, others=[], genus=None,
                          tname=None):
         '''
         Create (possibly multiple) Tasks to upload phenotypic data.
@@ -650,7 +682,7 @@ class ChadoDataLinker(object):
         # === Plan of Action ===
         # T1   - upload phenotypes from <descs>
         self.pheno_uniquenames = [] # used to later query the ids
-        t_phenos = self.__t2_create_phenoes(stocks, descs, tname)
+        t_phenos = self.__t2_create_phenoes(ids, descs, tname)
 
         # T2   - get geolocation ids        # has already been uploaded..
         # T2   - create_nd_experiment

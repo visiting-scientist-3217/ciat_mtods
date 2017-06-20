@@ -162,6 +162,7 @@ class TableGuru(utility.VerboseQuiet):
         arguments.'''
         if not self.TRANS or not self.TRANS_C or not hasattr(self, 'tr'):
             self.tr = self.get_translation()
+            self.tr_inv = utility.invert_dict(self.tr)
 
         def fill_with_cond(cond, c=None, o=None):
             tr = {}
@@ -206,8 +207,17 @@ class TableGuru(utility.VerboseQuiet):
                 return True
 
         elif table == 'stockprop':
-            # TODO: We might need to update this for every round, IF AND ONLY IF
-            #       there are double stock.name entries in the oracle database.
+            #XXX TMP
+            f = lambda a,b:False
+            return f, f
+            #XXX TMP
+
+            dups = self.oracle.check_duplicates(self.table, self.tr_inv['stock.name'])
+            if dups > 0:
+                msg = 'We need to update this for every round, IF AND ONLY IF'\
+                    + ' there are double {} entries in the oracle database.'
+                raise Warning(msg.format(self.tr_inv['stock.name']))
+
             if not hasattr(self, 'map_stock_name_to_id'):
                 stocks = self.chado.get_stock()
                 m = {}
@@ -255,59 +265,18 @@ class TableGuru(utility.VerboseQuiet):
                     return True
                 return False
 
-        elif table == 'phenotype':
-            # comparing with phenotype.value doesn't make any sense, in order
-            # to do this properly we would need to:
-            #   1. lookup attr_id->cvterm.name
-            #   2. lookup stock_id->stock.name
-            #   3. compare VARIEDAD with stock.name and attr_id with phenotype name
-            if not hasattr(self, 'map_stock_name_to_id') or \
-                    not hasattr(self, 'map_phenotype_attr_to_cvterm_id'):
-                sql = utility.PostgreSQLQueries.select_linked_phenotype
-                sql = sql.format(select='s.stock_id,s.name,p.attr_id,c.name')
-                self.chado.c.execute(sql)
-                res = self.chado.c.fetchall()
-                m1,m2 = {},{}
-                for s_id,s_name, p_attrid,cvt_name in res:
-                    m1.update({s_name : s_id})
-                    m2.update({cvt_name : p_attrid})
-                self.map_stock_name_to_id = m1
-                self.map_phenotype_attr_to_cvterm_id = m2
-            def f(p, cur):
-                m_stockid = self.map_stock_name_to_id
-                m_attrid = self.map_phenotype_attr_to_cvterm_id
-                stock,attr = p
-                if not m_stockid.has_key(stock) or not m_attrid.has_key(attr):
-                    return False
-                s_id = m_stockid[stock]
-                a_id = m_attrid[attr]
-                if [s_id, a_id] == cur: return True
-                return False
-            def f2(p, cur):
-                m_stockid = self.map_stock_name_to_id
-                m_attrid = self.map_phenotype_attr_to_cvterm_id
-                stock,attr = p
-                if not m_stockid.has_key(stock) or not m_attrid.has_key(attr):
-                    return False
-                s_id = m_stockid[stock]
-                a_id = m_attrid[attr]
-                if [s_id, a_id] in cur: return True
-                return False
-
         else:
-            # Origianlly we did only this:
             def f(ora, chad):
-                for a,b in conf.iteritems():
-                    try: # TODO[5] print what fails here! ('RAICES_COMERCIALES')
-                        if getattr(ora, a) != getattr(chad, b.split('.')[1]):
-                            return False
-                    except AttributeError:
-                        continue
-                return True
+                if chad in ora: return True
+                return False
+            def f2(ora, chads):
+                if ora.intersection(set(chad)): return True
+                return False
 
         f.__doc__ = 'is_eq(ora, chad) -> True if the oracle entry ora == chad'
         f2_doc = 'is_in(ora, c) -> True if ora is contained in iterable c'
-        if f2: f2.__doc__ = f2_doc
+        if f2 and not f2.__doc__:
+            f2.__doc__ = f2_doc
 
         return f,f2
 
@@ -322,10 +291,6 @@ class TableGuru(utility.VerboseQuiet):
         if not conf: return None, None, None, None
 
         is_eq, override = self.create_equal_comparison(table, conf, c_conf)
-        msg, fmt, j = '[equal-comp : {0}] {1}', '({0} == {1})', ','
-        it = conf.iteritems()
-        comps = j.join(fmt.format(i,j.split('.')[1]) for i,j in it)
-        self.vprint(msg.format(table, comps))
 
         def is_in(ora, chad_list):
             for c in chad_list:
@@ -376,62 +341,47 @@ class TableGuru(utility.VerboseQuiet):
                 raise NotImplementedError(msg.format(func_name))
             current = get_all_func()
 
-            # To specialize compare functions, we might need some special formats.
-            curr_overwrite = current
-            data_overwrite = self.data
-            tr_inv = utility.invert_dict(self.tr)
+            # Default to non-override
+            data_override = self.data
+            curr_override = current
+
+            if tab == 'stockprop':
+                curr_override = [[i.stock_id, i.type_id] for i in current]
+                self.vprint('xxx, current stockprops' + str(curr_override))
+                data_override = []
+                for attr in dir(self.data):
+                    if 'stockprop.' in attr:
+                        for d in self.data:
+                            data_override.append(
+                                [getattr(i, self.tr_inv['stock.name']),
+                                 getattr(i, attr)]
+                            )
+            elif tab == 'stock':
+                pass
+            else:
+                # Both _overrite lists are only used for comparison
+                curr_override = [p.uniquename for p in self.chado.get_phenotype()]
+                def tmp(d):
+                    id = getattr(d, self.tr_inv['id'])
+                    mkuniq = self.chado.make_pheno_unique
+                    uniqnames = set(mkuniq(id, t) for t in self.pheno_traits)
+                    return uniqnames
+                data_override = [tmp(d) for d in self.data]
 
             # We introduce an additional blacklist of single trait names here,
             # because we cannot drop a whole row (= stock), if only a few
             # traits are already present.
-            trait_blacklist = None
+            trait_blacklist = []
 
-            if tab == 'stockprop':
-                curr_overwrite = [[i.stock_id, i.type_id] for i in current]
-                data_overwrite = []
-                for attr in dir(self.data):
-                    if 'stockprop.' in attr:
-                        for d in self.data:
-                            data_overwrite.append(
-                                [getattr(i, tr_inv['stock.name']),
-                                 getattr(i, attr)]
-                            )
-            elif tab == 'phenotype':
-                # We have to execute this complex SQL-Query because neither
-                # stock.name nor stock.stock_id is directly linked to the
-                # phenotype.
-                curr_overwrite = []
-                sql = utility.PostgreSQLQueries.select_linked_phenotype
-                sql = sql.format(select='s.stock_id,c.cvterm_id')
-                print 'XXX', sql
-                self.chado.c.execute(sql)
-                print 'XXX', 'DONE'
-                res = self.chado.c.fetchall()
-                for stock_id,attr_id in res:
-                    curr_overwrite.append([stock_id, attr_id])
-                data_overwrite = []
-                for ora_attr,cha_attr in trg.iteritems():
-                    if not 'phenotype' in cha_attr: continue
-                    for d in self.data:
-                        t = self.__get_trait_name(ora_attr)
-                        if not t: break
-                        data_overwrite.append(
-                            [getattr(d, tr_inv['stock.name']), t]
-                        )
-
-            # It would be nice if is_in would throw a TypeError if the first
-            # argument is not a OracleDB entry or the second one is not a list
-            # of Chado entries.
             unknown = []
-            for entry,entry_ovrw in zip(self.data, data_overwrite):
+            for entry,entry_ovrw in zip(self.data, data_override):
                 msg = '[-] {0} {1} entry: {2}'
-                item = 'var:{0},gid:{1}'.format(entry.VARIEDAD, entry.GID)
+                id = getattr(entry, self.tr_inv['phenotype.uniquename'])
+                item = 'id:{0},stock:{1}'.format(id, entry.VARIEDAD)
                 msg = msg.format('{}',tab,item)
-                # curr_overwrite is only used for comparison, not actually
-                # appended to unknown
-                if not is_in(entry_ovrw, curr_overwrite) and not entry in unknown:
+                if not is_in(entry_ovrw, curr_override) and not entry in unknown:
                     unknown.append(entry)
-                elif is_in(entry_ovrw, curr_overwrite): self.vprint(msg.format('known'))
+                elif is_in(entry_ovrw, curr_override): self.vprint(msg.format('known'))
                 elif entry in unknown: self.vprint(msg.format('double'))
         else:
             unknown = self.data
@@ -563,8 +513,8 @@ class TableGuru(utility.VerboseQuiet):
 
         This functions refers to the chado 'stockprop' table.
         '''
-        stockprops, raw_data = self.__get_needed_data('stockprop', raw=True)
-        self.vprint('[+] stocks: {} rows'.format(len(stockprops)))
+        stockprops = self.__get_needed_data('stockprop')
+        self.vprint('[+] stockprops: {} rows'.format(len(stockprops)))
 
         if not stockprops:
             return None
@@ -621,17 +571,19 @@ class TableGuru(utility.VerboseQuiet):
             return []
 
         # Get metadata, we need to link.
-        tr_inv = utility.invert_dict(self.tr)
+        self.tr_inv = utility.invert_dict(self.tr)
 
         # stocks needs to be passed as aditional argument
-        stocks = [getattr(i, tr_inv['stock.name']) for i in raw_data]
+        stocks = [getattr(i, self.tr_inv['stock.name']) for i in raw_data]
+        ids = [getattr(i, self.tr_inv['id']) for i in raw_data]
 
         others = []
         for raw_entry in raw_data:
             new = {}
-            for k,ora_attr in tr_inv.iteritems():
+            for k,ora_attr in self.tr_inv.iteritems():
                 if k == 'nd_geolocation.description':
-                    name = getattr(raw_entry, tr_inv['nd_geolocation.description'])
+                    name = getattr(raw_entry,
+                                   self.tr_inv['nd_geolocation.description'])
                     new.update({'site_name' : name})
                 if 'stockprop' in k:
                     #k = k.lstrip('stockprop.')
@@ -672,7 +624,7 @@ class TableGuru(utility.VerboseQuiet):
         where = "common_name = '{}'".format(crp)
         genus = self.chado.get_organism(where=where)[0].genus
 
-        t_phen = self.linker.create_phenotype(stocks, descs, others=others,
+        t_phen = self.linker.create_phenotype(ids, stocks, descs, others=others,
                                               genus=genus)
         return t_phen
 
@@ -708,7 +660,7 @@ class TableGuru(utility.VerboseQuiet):
 
         return TableGuru.TRANS[self.table]
 
-    def create_upload_tasks(self, max_round_fetch=1000, test=None):
+    def create_upload_tasks(self, max_round_fetch=1500, test=None):
         '''Multiplexer for the single rake_{table} functions.
 
         Each create necessary workbooks for the specified table, save them and
@@ -717,13 +669,19 @@ class TableGuru(utility.VerboseQuiet):
         msg = '[create_upload_tasks] max_round_fetch={0}, test={1}'
         self.vprint(msg.format(max_round_fetch, test))
         self.tr = self.get_translation()
+        self.tr_inv = utility.invert_dict(self.tr)
+
+        self.pheno_traits = []
+        for ora,chad in self.tr.iteritems():
+            if 'phenotype.value' == chad: self.pheno_traits.append(ora)
 
         if test and (test < max_round_fetch):
             max_round_fetch = test
+
         sql = OSQL.get_all_from
-        # TODO Is GID ordering fine for all tables?
+        uniq_col = self.tr_inv['phenotype.uniquename']
         self.data = self.oracle.get_first_n(sql, max_round_fetch,
-                                            table=self.table, ord='GID')
+                                            table=self.table, ord=uniq_col)
 
         round_N = -1
         fetched = 0
@@ -756,12 +714,15 @@ class TableGuru(utility.VerboseQuiet):
             yield tasks
 
             print 'ccc', test, fetched
-            if test and fetched >= test: break
+            if test and fetched >= test:
+                print '[+] breaking <test>'
+                break
             self.data = self.oracle.get_n_more(sql, max_round_fetch,
                                                offset=fetched,
                                                table=self.table,
-                                               ord='GID')
+                                               ord=uniq_col)
             if not self.data:
+                print '[+] breaking <no-data>'
                 break
 
 # Just fill in some empty dict()'s.
