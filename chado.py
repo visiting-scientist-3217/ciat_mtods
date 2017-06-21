@@ -13,6 +13,7 @@ from utility import uniq
 from StringIO import StringIO
 from itertools import izip_longest as zip_pad
 import random
+from task_storage import TaskStorage
 
 DB='drupal7'
 USER='drupal7'
@@ -119,10 +120,16 @@ class ChadoPostgres(object):
         return result
 
     @staticmethod
-    def insert_into(table, values, columns=None, cursor=None):
+    def insert_into(table, values, columns=None, cursor=None, store=None):
         '''INSERT INTO <table> (columns) VALUES (values)
         
-        Needs a cursor to execute the insert statement.
+        kwargs:
+            columns     specify columns in values, default to all columns of
+                        table
+            cursor      needed
+            store       if given must be of the form [a,b] will store the
+                        RETURNING column <a> of the insert statement into
+                        TaskStorage.b
         '''
         #msg = '[+] insert_into->{0}\n\t({1})\n\t-> (VALUES {2} ...])'
         #print msg.format(table, columns, str(values)[:80])
@@ -133,9 +140,25 @@ class ChadoPostgres(object):
             raise RuntimeError(msg)
         if not cursor:
             raise RuntimeError('need cursor object')
-        f = StringIO('\n'.join('\t'.join(str(v) for v in vs) for vs in values))
-        cursor.copy_from(f, table, columns=columns)
-        cursor.connection.commit()
+
+        w = values
+        if not store:
+            # default to using fileIO
+            f = StringIO('\n'.join('\t'.join(str(i) for i in v) for v in w))
+            cursor.copy_from(f, table, columns=columns)
+            cursor.connection.commit()
+        else:
+            # making VALUE-format: ('a', 'b'), ('c', ..), ..
+            c, p, q = ',', "({})", "'{}'"
+            f = c.join(p.format(c.join(q.format(i) for i in v)) for v in w)
+            sql = '''
+                INSERT INTO {table} {columns} VALUES {values} RETURNING {what}
+            '''
+            columns = p.format(','.join(columns))
+            sql = sql.format(table=table, columns=columns, values=f, what=store[0])
+            cursor.execute(sql)
+            res = cursor.fetchall()
+            setattr(TaskStorage, store[1], res)
 
     @staticmethod
     def fetch_y_insert_into(fetch_stmt, values_constructor, *insert_args,
@@ -164,6 +187,18 @@ class ChadoPostgres(object):
         args = list(insert_args)
         # replaces values with the constructed join'ed ones
         args[1] = values_constructor(insert_args[1], fetch_res)
+        ChadoPostgres.insert_into(*args, **insert_kwargs)
+
+    @staticmethod
+    def storage_y_insert_into(values_constructor, *insert_args,
+                              **insert_kwargs):
+        '''Construct insert_into content with the <values_constructor> and the
+        global TaskStorage object.
+        '''
+        if not insert_kwargs.has_key('cursor'):
+            raise RuntimeError('need cursor object')
+        args = list(insert_args)
+        args[1] = values_constructor(args[1], TaskStorage)
         ChadoPostgres.insert_into(*args, **insert_kwargs)
 
     # Following function definitions where made manually, as the identifying
@@ -331,15 +366,16 @@ class ChadoPostgres(object):
         self.__delete_where('phenotype', cond)
 
     def delete_nd_experiment(self, phenotype=None, stock=None):
-        if phenotype:
+        if phenotype: # XXX something wrong here, deleting too much!
             sql = '''
-                SELECT e.nd_experiment_id FROM nd_experiment AS e
-                    JOIN nd_experiment_phenotype ep
-                        ON e.nd_experiment_id = ep.nd_experiment_id
-                    WHERE ep.phenotype_id = {}
+                SELECT e.nd_experiment_id,ep.phenotype_id
+                    FROM nd_experiment AS e, nd_experiment_phenotype AS ep
+                    WHERE e.nd_experiment_id = ep.nd_experiment_id
+                        AND ep.phenotype_id = {}
             '''.format(phenotype.phenotype_id)
             r = self.__exe(sql)
             if len(r) == 0: return
+            if len(r) > 1: print r, phenotype.phenotype_id
             exp_id = r[0][0]
             cond = "nd_experiment_id = {}".format(exp_id)
         elif stock:
@@ -455,7 +491,7 @@ class ChadoDataLinker(object):
         if not stock_uniqs:
             stock_uniqs = stock_names
         it = zip(stock_names, stock_uniqs)
-        # need to make the name unique.. XXX do we rly need this?
+        # need to make the name unique.. 
         it = uniq(it, key=lambda x: x[0])
         # need to make the uniquename unique..
         it = uniq(it, key=lambda x: x[1])
@@ -465,7 +501,8 @@ class ChadoDataLinker(object):
         if tname: name = name + '({})'.format(tname)
         f = self.chado.insert_into
         args = ('stock', content, self.STOCK_COLS)
-        kwargs = {'cursor' : self.con.cursor()}
+        kwargs = {'cursor' : self.con.cursor(),
+                  'store' : ['stock_id', 'stock_ids']}
         t = Task(name, f, *args, **kwargs)
         return [t,]
 
@@ -552,7 +589,7 @@ class ChadoDataLinker(object):
         s = '{0}_{1}'
         return s.format(id, name)
 
-    def __t2_create_phenoes(self, ids, descs, tname=None):
+    def __t1_create_phenoes(self, ids, descs, tname=None):
         content = []
         attr_ids = {}
         for id,d in zip(ids, descs):
@@ -570,7 +607,8 @@ class ChadoDataLinker(object):
         if tname: name = name + '({})'.format(tname)
         f = self.chado.insert_into
         args = ('phenotype', content, self.PHENO_COLS)
-        kwargs = {'cursor' : self.con.cursor()}
+        kwargs = {'cursor' : self.con.cursor(),
+                  'store'  : ['phenotype_id', 'phenotype_ids']}
         return Task(name, f, *args, **kwargs)
 
     def __get_geo_names(self, others):
@@ -583,16 +621,22 @@ class ChadoDataLinker(object):
             gs.append(n)
         return gs
 
-    def __t3_create_experiments(self, others, stocks, tname=None):
+    def __t2_create_experiments(self, ids, descs, others, stocks, tname=None):
+        # TODO remove ids from this func
+        ld, lo, li = len(descs), len(others), len(ids)
+        if ld != lo or ld != li:
+            msg = 'descriptors({}) ?= others({}) ?= ids({})'
+            raise RuntimeError(msg.format(ld, lo, li))
+
         gs = self.__get_geo_names(others)
-        geos = ["('{}')".format(s) for s in gs]
+        geos = ["('{0}')".format(s) for s in gs]
         stmt = '''
             SELECT g.nd_geolocation_id FROM (VALUES {}) AS v
                 JOIN nd_geolocation g ON v.column1 = g.description
         '''
         stmt = stmt.format(','.join(geos))
         def join_func(type_id, stmt_res):
-            return map(lambda x: [x[0], type_id], stmt_res)
+            return [[x[0], type_id] for x in stmt_res]
             # [type_id, geolocation_id]
         type_id = self.__get_or_create_cvterm('phenotyping').cvterm_id
 
@@ -600,7 +644,8 @@ class ChadoDataLinker(object):
         if tname: name = name + '({})'.format(tname)
         f = self.chado.fetch_y_insert_into
         insert_args = ['nd_experiment', type_id, self.EXP_COLS]
-        insert_kwargs = {'cursor'  : self.con.cursor()}
+        insert_kwargs = {'cursor'  : self.con.cursor(),
+                         'store'   : ['nd_experiment_id', 'nd_experiment_ids']}
         args = [stmt, join_func]
         args += insert_args
         kwargs = {}
@@ -608,58 +653,59 @@ class ChadoDataLinker(object):
         t = Task(name, f, *args, **kwargs)
         return [t,]
 
-    def __t4_link(self, others, stocks, tname=None):
+    def __t3_link(self, others, stocks, tname=None):
         linkers = []
 
-        stmt = '''
-            SELECT e.nd_experiment_id,j.{result} FROM (VALUES {values}) AS v
-                JOIN {join} j ON v.column1 = j.{join_col}
-                JOIN nd_geolocation g ON v.column2 = g.description
-                JOIN nd_experiment e ON g.nd_geolocation_id = e.nd_geolocation_id
-        '''
-        geos = self.__get_geo_names(others)
-        # need same length, otherwise following zip() will skip stocks!
-        while len(geos) < len(stocks):
-            geos.append('Not Available')
-
         # -- stocks --
-        values = ','.join("('{}', '{}')".format(s, g) for s,g in zip(stocks,geos))
-        stock_stmt = stmt.format(result='stock_id', values=values,
-                                 join='stock', join_col='name')
         cvt = self.__get_or_create_cvterm('sample')
         type_id = cvt.cvterm_id
-        def join_stock_func(type_id,stmt_res):
-            return map(lambda x: [x[0], x[1], type_id], stmt_res)
-            # [nd_experiment_id, stock_id, type_id]
+        def join_stock_func(type_id,ts):
+            le, ls = len(ts.nd_experiment_ids), len(ts.stock_ids)
+            if le != ls:
+                msg = 'stocks({}) != experiments({})'
+                raise RuntimeError(msg.format(le,ls))
+            it = zip(ts.nd_experiment_ids, ts.stock_ids)
+            return [[eid[0], sid[0], type_id] for eid,sid in it]
 
         name = 'link stocks'
         if tname: name = name + '({})'.format(tname)
-        f = self.chado.fetch_y_insert_into
+        f = self.chado.storage_y_insert_into
         insert_args = ['nd_experiment_stock', type_id, self.EXP_STOCK_COLS]
         insert_kwargs = {'cursor' : self.con.cursor()}
-        args = [stock_stmt, join_stock_func]
+        args = [join_stock_func]
         args += insert_args
         kwargs = {}
         kwargs.update(insert_kwargs)
         linkers.append(Task(name, f, *args, **kwargs))
 
         # -- phenotypes --
-        # Same here, if unequal, we skip data..
-        while len(geos) < len(self.pheno_uniquenames):
-            geos.append('Not Available')
-        it = zip(self.pheno_uniquenames, geos)
-        values = ','.join("('{}', '{}')".format(p, g) for p,g in it)
-        pheno_stmt = stmt.format(result='phenotype_id', values=values,
-                                 join='phenotype', join_col='uniquename')
-        def join_pheno_func(_, stmt_res):
-            return stmt_res
+        def join_pheno_func(uniquenames, ts):
+            print 'xxx', len(uniquenames)
+            eid_iter = iter(ts.nd_experiment_ids)
+            pid_iter = iter(ts.phenotype_ids)
+            test_iter = iter(uniquenames)
+            last_id = next(test_iter)
+            r = []
+            while True:
+                try:
+                    new_id = next(test_iter)
+                    # only if we have a new row id we go to the next experiment
+                    if new_id != last_id: 
+                        eid = next(eid_iter)
+                    pid = next(pid_iter)
+                    r.append([eid[0],pid[0]])
+                    last_id = new_id
+                except StopIteration:
+                    break
+            #it = zip(ts.nd_experiment_ids, ts.phenotype_ids)
+            return r #[[i[0],j[0]] for i,j in it]
 
         name = 'link phenotypes'
         if tname: name = name + '({})'.format(tname)
-        f = self.chado.fetch_y_insert_into
-        insert_args = ['nd_experiment_phenotype', None, self.EXP_PHENO_COLS]
+        f = self.chado.storage_y_insert_into
+        insert_args = ['nd_experiment_phenotype', self.pheno_uniquenames, self.EXP_PHENO_COLS]
         insert_kwargs = {'cursor' : self.con.cursor()}
-        args = [pheno_stmt, join_pheno_func]
+        args = [join_pheno_func]
         args += insert_args
         kwargs = {}
         kwargs.update(insert_kwargs)
@@ -667,8 +713,6 @@ class ChadoDataLinker(object):
 
         return linkers
 
-    # FIXME: missleading name, we do so much more than just create phenotypeing
-    #        entries..
     def create_phenotype(self, ids, stocks, descs, others=[], genus=None,
                          tname=None):
         '''
@@ -682,16 +726,17 @@ class ChadoDataLinker(object):
         # === Plan of Action ===
         # T1   - upload phenotypes from <descs>
         self.pheno_uniquenames = [] # used to later query the ids
-        t_phenos = self.__t2_create_phenoes(ids, descs, tname)
+        t_phenos = self.__t1_create_phenoes(ids, descs, tname)
 
         # T2   - get geolocation ids        # has already been uploaded..
         # T2   - create_nd_experiment
-        t_experiment = self.__t3_create_experiments(others, stocks)
+        t_experiment = self.__t2_create_experiments(ids, descs, others, stocks)
 
         # T3   - get stock ids, and nd_experiment ids
+        # T3   - link 'em
         # T3   - get phenotype ids, and nd_experiment ids
         # T3   - link 'em
-        t_link = self.__t4_link(others, stocks)
+        t_link = self.__t3_link(others, stocks)
         del self.pheno_uniquenames
 
         return ([t_phenos, t_experiment], t_link)

@@ -74,6 +74,7 @@ class PostgreTests(unittest.TestCase):
         cls.pheno_kwargs = {
                 'others' : [{'pick_date': 12, 'plant_date' : 13},
                             {'pick_date': 21, 'plant_date' : 31},
+                            {}
                            ]
             }
         cls.props = [
@@ -245,6 +246,7 @@ class PostgreTests(unittest.TestCase):
         r = ConTest.chadodb.c.fetchall()
         phenoes = set(i[0] for i in r)
         pheno_uniqenames = set(i[2] for i in r)
+        raw_input('Tests done. <RETURN!!1>') # XXX Remove me
         stocks = set(i[1] for i in r)
         for s in self.stocks:
             self.assertIn(s, stocks)
@@ -255,6 +257,8 @@ class PostgreTests(unittest.TestCase):
         for ps in self.pheno_args[2]:
             for v in ps.values():
                 self.assertIn(str(v), phenoes)
+
+        raw_input('Tests done. <RETURN!!1>') # XXX Remove me
 
 
 class OracleTests(unittest.TestCase):
