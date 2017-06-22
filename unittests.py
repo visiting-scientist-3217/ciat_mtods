@@ -246,7 +246,6 @@ class PostgreTests(unittest.TestCase):
         r = ConTest.chadodb.c.fetchall()
         phenoes = set(i[0] for i in r)
         pheno_uniqenames = set(i[2] for i in r)
-        raw_input('Tests done. <RETURN!!1>') # XXX Remove me
         stocks = set(i[1] for i in r)
         for s in self.stocks:
             self.assertIn(s, stocks)
@@ -257,8 +256,6 @@ class PostgreTests(unittest.TestCase):
         for ps in self.pheno_args[2]:
             for v in ps.values():
                 self.assertIn(str(v), phenoes)
-
-        raw_input('Tests done. <RETURN!!1>') # XXX Remove me
 
 
 class OracleTests(unittest.TestCase):
@@ -274,7 +271,7 @@ class OracleTests(unittest.TestCase):
 
 class BigTest(unittest.TestCase):
     '''Monolitic tests, building up some state.'''
-    enableThisMonoliticTestWithLongDuration = False
+    enableThisMonoliticTestWithLongDuration = True
 
     # Append my msg to default msg.
     longMessage = True 
@@ -282,7 +279,7 @@ class BigTest(unittest.TestCase):
     # Number of lines imported, this times the number of understood traits
     # should directly correlate to the added rows of phenotyping data in chado.
     # If 'None' all data will be imported.
-    NTEST = 700
+    NTEST = 10000
 
     def step10_stateful_setup(self):
         self.done_pg_backup = False

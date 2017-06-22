@@ -10,10 +10,12 @@ from utility import PostgreSQLQueries as PSQLQ
 from utility import make_namedtuple_with_query
 from utility import Task
 from utility import uniq
+import utility
 from StringIO import StringIO
 from itertools import izip_longest as zip_pad
 import random
 from task_storage import TaskStorage
+from collections import Counter
 
 DB='drupal7'
 USER='drupal7'
@@ -366,7 +368,7 @@ class ChadoPostgres(object):
         self.__delete_where('phenotype', cond)
 
     def delete_nd_experiment(self, phenotype=None, stock=None):
-        if phenotype: # XXX something wrong here, deleting too much!
+        if phenotype:
             sql = '''
                 SELECT e.nd_experiment_id,ep.phenotype_id
                     FROM nd_experiment AS e, nd_experiment_phenotype AS ep
@@ -586,7 +588,7 @@ class ChadoDataLinker(object):
 
     @staticmethod
     def make_pheno_unique(id, name):
-        s = '{0}_{1}'
+        s = '{0}__{1}'
         return s.format(id, name)
 
     def __t1_create_phenoes(self, ids, descs, tname=None):
@@ -600,7 +602,7 @@ class ChadoDataLinker(object):
                     attr_ids.update({descriptor : new})
                 attr_id = attr_ids[descriptor]
                 uniq = self.make_pheno_unique(id, descriptor)
-                self.pheno_uniquenames.append(uniq)
+                self.pheno_uniquenames.append(id)
                 if value is None: value = ''
                 content.append([uniq, attr_id, value])
         name = 'phenotype upload'
@@ -662,8 +664,21 @@ class ChadoDataLinker(object):
         def join_stock_func(type_id,ts):
             le, ls = len(ts.nd_experiment_ids), len(ts.stock_ids)
             if le != ls:
-                msg = 'stocks({}) != experiments({})'
-                raise RuntimeError(msg.format(le,ls))
+                # we fill in the holes in the known stock_ids with the new ones
+                ls = len(ts.stock_ids)
+                c = Counter(ts.known_stock_ids)
+                if c[None] > 0 and c[None] + c[utility.Duplicate] != ls:
+                    msg = 'holes in known stocks({}) != new stocks({})'
+                    raise RuntimeError(msg.format(c[None],ls))
+                stock_ids = []
+                new = iter(ts.stock_ids)
+                for known in ts.known_stock_ids:
+                    if type(known) == list:
+                        stock_ids.append([new])
+                    else:
+                        stock_ids.append([known if known else next(new)])
+                ts.stock_ids = stock_ids
+
             it = zip(ts.nd_experiment_ids, ts.stock_ids)
             return [[eid[0], sid[0], type_id] for eid,sid in it]
 
@@ -679,26 +694,29 @@ class ChadoDataLinker(object):
         linkers.append(Task(name, f, *args, **kwargs))
 
         # -- phenotypes --
-        def join_pheno_func(uniquenames, ts):
-            print 'xxx', len(uniquenames)
+        def join_pheno_func(ids, ts):
+            if len(ids) == len(set(ids)):
+                raise Warning('Only one phenotype per data line? Unlikely!')
             eid_iter = iter(ts.nd_experiment_ids)
             pid_iter = iter(ts.phenotype_ids)
-            test_iter = iter(uniquenames)
+            test_iter = iter(ids)
+
             last_id = next(test_iter)
+            eid = next(eid_iter)
+            pid = next(pid_iter)
             r = []
             while True:
                 try:
-                    new_id = next(test_iter)
                     # only if we have a new row id we go to the next experiment
+                    r.append([eid[0], pid[0]])
+                    new_id = next(test_iter)
                     if new_id != last_id: 
                         eid = next(eid_iter)
                     pid = next(pid_iter)
-                    r.append([eid[0],pid[0]])
                     last_id = new_id
                 except StopIteration:
                     break
-            #it = zip(ts.nd_experiment_ids, ts.phenotype_ids)
-            return r #[[i[0],j[0]] for i,j in it]
+            return r
 
         name = 'link phenotypes'
         if tname: name = name + '({})'.format(tname)

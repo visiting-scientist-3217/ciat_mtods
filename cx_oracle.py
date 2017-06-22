@@ -84,7 +84,6 @@ class Oracledb():
             self.cur.execute(header_sql)
             headers = [utility.normalize(i[1]) for i in self.cur.fetchall()]
             self.lastheaders = headers
-            print 'xxx', headers
 
     def __format(self, data, table):
         'formats data as namedtuples'
@@ -94,7 +93,6 @@ class Oracledb():
                                                         self.lasttable, data)
         else: 
             raise RuntimeError('table not found')
-        print 'XXX, formated data with:', table
         return data
 
     def get_rows(self, sql, table=None, fetchamount=None, raw=False, save_as=None):

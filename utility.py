@@ -8,14 +8,17 @@
 # So psycopg2 is level 2 threadsave, but our std-lib is not. Here you see the
 # easiest way I could think of to fix this:
 from gevent import monkey
-monkey.patch_all() # needs to be executed before threading, because the
-                   # mainthread gets index'ed on that import, and gevent
+monkey.patch_all() # Needs to be executed before threading, because the
+                   # mainthread gets indexed on that import, and gevent
                    # replaces the indexing function, thus will create another
-                   # index value, which will later lead to a crash
+                   # index value, which will lead to a crash, once we search
+                   # for the index of the main thread.
 
 import threading
 from collections import namedtuple
 from re import sub
+
+class Duplicate(): pass
 
 def invert_dict(d):
     '''Switch keys with values in a dict.'''
@@ -23,6 +26,13 @@ def invert_dict(d):
     for k,v in d.iteritems():
         new.update({v:k})
     return new
+
+def get_uniq_id(entry, trans, only_attrs=False):
+    attr = [trans[k] for k in trans.keys() if k.startswith('unique_id')]
+    attr = [a.lstrip('_') for a in attr] # see trans.conf for an explanation
+    attr = sorted(attr)
+    if only_attrs: return attr
+    return '_'.join(str(getattr(entry, a)) for a in attr)
 
 def make_namedtuple_with_query(cursor, query, name, data):
     '''Return <data> as a named tuple, called <name>.

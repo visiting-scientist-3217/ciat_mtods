@@ -1,10 +1,12 @@
 import utility
 from utility import OracleSQLQueries as OSQL
+from utility import get_uniq_id as uid
 import chado
 import cassava_ontology
 import ConfigParser
 import os
 import datetime
+from task_storage import TaskStorage
 
 # Path to the translation cfg file.
 CONF_PATH = 'trans.conf'
@@ -124,6 +126,10 @@ class TableGuru(utility.VerboseQuiet):
         if entry in TableGuru.COLUMNS[table]:
             TableGuru.TRANS[table][entry] = conf.get(table, entry)
             return True
+        if entry.lstrip('_') in TableGuru.COLUMNS[table]:
+            TableGuru.TRANS[table][entry] = conf.get(table, entry)
+            self.vprint('Note: done lstrip(_) for "{}"'.format(entry))
+            return True
         if TableGuru.TRANS_C.has_key(entry):
             return True
 
@@ -195,6 +201,8 @@ class TableGuru(utility.VerboseQuiet):
         f,f2 = None,None
 
         if table == 'stock':
+            TaskStorage.known_stock_ids = []
+            TaskStorage.unknown_stocks = []
             def f(ora, chad):
                 compared_something = False
                 for ora_attr, chad_attr in conf.iteritems():
@@ -205,6 +213,18 @@ class TableGuru(utility.VerboseQuiet):
                 if not compared_something:
                     raise Warning('[stock] compared nothing')
                 return True
+            def f2(ora, chads):
+                for c in chads:
+                    if f(ora, c):
+                        # it's equal, lets append its name to known names
+                        TaskStorage.known_stock_ids.append(c.stock_id)
+                        return True
+                if ora in TaskStorage.unknown_stocks: # duplicate!
+                    TaskStorage.known_stock_ids.append(utility.Duplicate)
+                else:
+                    TaskStorage.unknown_stocks.append(ora)
+                TaskStorage.known_stock_ids.append(None)
+                return False
 
         elif table == 'stockprop':
             #XXX TMP
@@ -270,7 +290,7 @@ class TableGuru(utility.VerboseQuiet):
                 if chad in ora: return True
                 return False
             def f2(ora, chads):
-                if ora.intersection(set(chad)): return True
+                if ora.intersection(set(chads)): return True
                 return False
 
         f.__doc__ = 'is_eq(ora, chad) -> True if the oracle entry ora == chad'
@@ -362,27 +382,22 @@ class TableGuru(utility.VerboseQuiet):
                 # Both _overrite lists are only used for comparison
                 curr_override = [p.uniquename for p in self.chado.get_phenotype()]
                 def tmp(d):
-                    id = getattr(d, self.tr_inv['id'])
-                    mkuniq = self.chado.make_pheno_unique
+                    id = uid(d, self.tr_inv)
+                    mkuniq = chado.ChadoDataLinker.make_pheno_unique
                     uniqnames = set(mkuniq(id, t) for t in self.pheno_traits)
                     return uniqnames
                 data_override = [tmp(d) for d in self.data]
 
-            # We introduce an additional blacklist of single trait names here,
-            # because we cannot drop a whole row (= stock), if only a few
-            # traits are already present.
-            trait_blacklist = []
-
             unknown = []
             for entry,entry_ovrw in zip(self.data, data_override):
-                msg = '[-] {0} {1} entry: {2}'
-                id = getattr(entry, self.tr_inv['phenotype.uniquename'])
-                item = 'id:{0},stock:{1}'.format(id, entry.VARIEDAD)
-                msg = msg.format('{}',tab,item)
+                #msg = '[-] {0} {1} entry: {2}'
+                #id = uid(entry, self.tr_inv)
+                #item = 'id:{0},stock:{1}'.format(id, entry.VARIEDAD)
+                #msg = msg.format('{}',tab,item)
                 if not is_in(entry_ovrw, curr_override) and not entry in unknown:
                     unknown.append(entry)
-                elif is_in(entry_ovrw, curr_override): self.vprint(msg.format('known'))
-                elif entry in unknown: self.vprint(msg.format('double'))
+                #elif is_in(entry_ovrw, curr_override): self.vprint(msg.format('known'))
+                #elif entry in unknown: self.vprint(msg.format('double'))
         else:
             unknown = self.data
 
@@ -575,7 +590,7 @@ class TableGuru(utility.VerboseQuiet):
 
         # stocks needs to be passed as aditional argument
         stocks = [getattr(i, self.tr_inv['stock.name']) for i in raw_data]
-        ids = [getattr(i, self.tr_inv['id']) for i in raw_data]
+        ids = [uid(i, self.tr_inv) for i in raw_data]
 
         others = []
         for raw_entry in raw_data:
@@ -673,13 +688,15 @@ class TableGuru(utility.VerboseQuiet):
 
         self.pheno_traits = []
         for ora,chad in self.tr.iteritems():
-            if 'phenotype.value' == chad: self.pheno_traits.append(ora)
+            if 'phenotype.value' == chad:
+                self.pheno_traits.append(self.__get_trait_name(ora))
 
         if test and (test < max_round_fetch):
             max_round_fetch = test
 
         sql = OSQL.get_all_from
-        uniq_col = self.tr_inv['phenotype.uniquename']
+        primary_key_columns = uid(None, self.tr_inv, only_attrs=True)
+        uniq_col = ', '.join(primary_key_columns)
         self.data = self.oracle.get_first_n(sql, max_round_fetch,
                                             table=self.table, ord=uniq_col)
 
@@ -713,16 +730,13 @@ class TableGuru(utility.VerboseQuiet):
             )
             yield tasks
 
-            print 'ccc', test, fetched
             if test and fetched >= test:
-                print '[+] breaking <test>'
                 break
             self.data = self.oracle.get_n_more(sql, max_round_fetch,
                                                offset=fetched,
                                                table=self.table,
                                                ord=uniq_col)
             if not self.data:
-                print '[+] breaking <no-data>'
                 break
 
 # Just fill in some empty dict()'s.
