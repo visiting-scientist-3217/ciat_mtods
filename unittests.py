@@ -44,21 +44,21 @@ class PostgreTests(unittest.TestCase):
         cls.cvts = ['abc', 'def']
         cls.stocks = ['12 GM 2319023 z', '12 GM 2319023 lsd', '12 GM 2319023 AAlsd']
         cls.sites = [
-                {'nd_geolocation.description' : 'asdfAA',
+                {'nd_geolocation.description' : 'I am somewhere',
                  'nd_geolocation.altitude'    : '1',
                  'nd_geolocation.latitude'    : '666N',
                  'nd_geolocation.longitude'   : ' 73W'},
-                {'nd_geolocation.description' : 'asdfAAr2',
+                {'nd_geolocation.description' : 'I have never been here',
                  'nd_geolocation.altitude'    : '2',
                  'nd_geolocation.latitude'    : ' 038',
                  'nd_geolocation.longitude'   : '87'},
             ]
         cls.sites_clean = [ # used for deletion, and tests
-                {'nd_geolocation.description' : 'asdfAA',
+                {'nd_geolocation.description' : 'I am somewhere',
                  'nd_geolocation.altitude'    : '1',
                  'nd_geolocation.latitude'    : '666',
                  'nd_geolocation.longitude'   : '-73'},
-                {'nd_geolocation.description' : 'asdfAAr2',
+                {'nd_geolocation.description' : 'I have never been here',
                  'nd_geolocation.altitude'    : '2',
                  'nd_geolocation.latitude'    : '38',
                  'nd_geolocation.longitude'   : '87'},
@@ -77,6 +77,8 @@ class PostgreTests(unittest.TestCase):
                             {}
                            ]
             }
+        cls.pheno_kwargs['others'][0].update({'site_name' : cls.sites[0]['nd_geolocation.description' ]})
+        cls.pheno_kwargs['others'][1].update({'site_name' : cls.sites[1]['nd_geolocation.description' ]})
         cls.props = [
                 [cls.stocks[0], 'Avaluuea',],
                 [cls.stocks[1], 'Bvaluauaeas',],
@@ -256,6 +258,18 @@ class PostgreTests(unittest.TestCase):
         for ps in self.pheno_args[2]:
             for v in ps.values():
                 self.assertIn(str(v), phenoes)
+
+        # check geolocation linking
+        sql = '''
+            SELECT g.description FROM nd_experiment AS e
+                JOIN nd_geolocation g
+                    ON g.nd_geolocation_id = e.nd_geolocation_id
+                WHERE g.nd_geolocation_id != 1
+        '''
+        ConTest.chadodb.c.execute(sql)
+        r = set(i[0] for i in ConTest.chadodb.c.fetchall())
+        for g in self.sites_clean:
+            self.assertIn(g['nd_geolocation.description'], r)
 
 
 class OracleTests(unittest.TestCase):

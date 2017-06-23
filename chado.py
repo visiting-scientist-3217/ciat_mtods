@@ -133,8 +133,6 @@ class ChadoPostgres(object):
                         RETURNING column <a> of the insert statement into
                         TaskStorage.b
         '''
-        #msg = '[+] insert_into->{0}\n\t({1})\n\t-> (VALUES {2} ...])'
-        #print msg.format(table, columns, str(values)[:80])
         if len(values) == 0: raise RuntimeError('No values to upload')
         if not type(values[0]) in [list, tuple]:
             msg = 'expected values = [[...], [...], ...]\n\tbut received: {}'
@@ -377,7 +375,9 @@ class ChadoPostgres(object):
             '''.format(phenotype.phenotype_id)
             r = self.__exe(sql)
             if len(r) == 0: return
-            if len(r) > 1: print r, phenotype.phenotype_id
+            if len(r) > 1:
+                msg = 'Ambiguous Phenotype deletion. id:{}, name:{}'
+                raise Warning(msg.format(r, phenotype.phenotype_id))
             exp_id = r[0][0]
             cond = "nd_experiment_id = {}".format(exp_id)
         elif stock:
@@ -564,9 +564,8 @@ class ChadoDataLinker(object):
             stocks = sorted(stmt_res, key=lambda x: x[1])
             props = sorted(props, key=lambda x: x[0])
             if not len(stocks) == len(props):
-                print 'sss', stocks
-                print 'ppp', props
-                raise RuntimeError('unequal stocks/stockprops, unlikely')
+                msg = 'unequal stocks/stockprops, unlikely\nstocks:{}\nprops:{}'
+                raise RuntimeError(msg.format(stocks, props))
             join = zip(stocks, props)
             content = [[sck[0],type_id,prp[1]] for sck,prp in join]
             #               ^ stock_id     ^ value
@@ -616,7 +615,7 @@ class ChadoDataLinker(object):
     def __get_geo_names(self, others):
         gs = []
         for i in others:
-            if hasattr(i, 'site_name'):
+            if i.has_key('site_name'):
                 n = i['site_name']
             else:
                 n = 'Not Available'
@@ -639,7 +638,7 @@ class ChadoDataLinker(object):
         stmt = stmt.format(','.join(geos))
         def join_func(type_id, stmt_res):
             return [[x[0], type_id] for x in stmt_res]
-            # [type_id, geolocation_id]
+            # [geolocation_id, type_id]
         type_id = self.__get_or_create_cvterm('phenotyping').cvterm_id
 
         name = 'nd_experiment upload'
@@ -667,16 +666,21 @@ class ChadoDataLinker(object):
                 # we fill in the holes in the known stock_ids with the new ones
                 ls = len(ts.stock_ids)
                 c = Counter(ts.known_stock_ids)
-                if c[None] > 0 and c[None] + c[utility.Duplicate] != ls:
-                    msg = 'holes in known stocks({}) != new stocks({})'
-                    raise RuntimeError(msg.format(c[None],ls))
+                lnone_n_dups = c[None] + c[utility.Duplicate]
+                if c[None] > 0 and c[None] != ls:
+                    msg = 'holes({})+dups({}) in known stocks(={}) != new'\
+                        + ' stocks({})'
+                    msg = msg.format(c[None], c[utility.Duplicate],
+                                     lnone_n_dups, ls)
+                    raise RuntimeError(msg)
                 stock_ids = []
-                new = iter(ts.stock_ids)
-                for known in ts.known_stock_ids:
-                    if type(known) == list:
-                        stock_ids.append([new])
+                new = iter(ts.stock_ids) # -> [(321,), (123,), ...]
+                for known in ts.known_stock_ids: # -> [321, 123, None, Dup, ...]
+                    if known.__class__ == utility.Duplicate:
+                        duplicate = known
+                        stock_ids.append(ts.stock_ids[duplicate.index])
                     else:
-                        stock_ids.append([known if known else next(new)])
+                        stock_ids.append([known] if known else next(new))
                 ts.stock_ids = stock_ids
 
             it = zip(ts.nd_experiment_ids, ts.stock_ids)

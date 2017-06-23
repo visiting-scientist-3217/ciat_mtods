@@ -18,7 +18,9 @@ import threading
 from collections import namedtuple
 from re import sub
 
-class Duplicate(): pass
+class Duplicate():
+    def __init__(self, index):
+        self.index = index
 
 def invert_dict(d):
     '''Switch keys with values in a dict.'''
@@ -168,9 +170,9 @@ class Task(VerboseQuiet):
     def execute(self, thread=False):
         '''Calls self.job with given args and kwargs.'''
         if thread:
-            msg = '\n[exec-thrd] {}'
+            msg = '[exec-thrd] {}'
         else:
-            msg = '\n[exec] {}'
+            msg = '[exec] {}'
         self.vprint(msg.format(self.__str__()[:70]+'...)'))
         self.job(*self.args, **self.kwargs)
     def __str__(self):

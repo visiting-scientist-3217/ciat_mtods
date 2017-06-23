@@ -219,40 +219,33 @@ class TableGuru(utility.VerboseQuiet):
                         # it's equal, lets append its name to known names
                         TaskStorage.known_stock_ids.append(c.stock_id)
                         return True
-                if ora in TaskStorage.unknown_stocks: # duplicate!
-                    TaskStorage.known_stock_ids.append(utility.Duplicate)
+                c_in = utility.invert_dict(conf)
+                ora_stock_name = getattr(ora, c_in['stock.name'])
+                if ora_stock_name in TaskStorage.unknown_stocks:
+                    index = TaskStorage.unknown_stocks.index(ora_stock_name)
+                    dup = utility.Duplicate(index)
+                    TaskStorage.known_stock_ids.append(dup)
                 else:
-                    TaskStorage.unknown_stocks.append(ora)
-                TaskStorage.known_stock_ids.append(None)
+                    TaskStorage.unknown_stocks.append(ora_stock_name)
+                    TaskStorage.known_stock_ids.append(None)
                 return False
 
         elif table == 'stockprop':
-            #XXX TMP
-            f = lambda a,b:False
-            return f, f
-            #XXX TMP
+            # need to update the mapping every round..
+            stocks = self.chado.get_stock()
+            m = {}
+            for s in stocks: m.update({s.name : s.stock_id})
+            self.map_stock_name_to_id = m
 
-            dups = self.oracle.check_duplicates(self.table, self.tr_inv['stock.name'])
-            if dups > 0:
-                msg = 'We need to update this for every round, IF AND ONLY IF'\
-                    + ' there are double {} entries in the oracle database.'
-                raise Warning(msg.format(self.tr_inv['stock.name']))
-
-            if not hasattr(self, 'map_stock_name_to_id'):
-                stocks = self.chado.get_stock()
-                m = {}
-                for s in stocks: m.update({s.name : s.stock_id})
-                self.map_stock_name_to_id = m
-            if not hasattr(self, 'map_stockprop_type_to_cvterm_id'):
-                m = {}
-                sps = self.chado.get_stockprop()
-                cvts = self.chado.get_cvterm()
-                for sp in sps:
-                    spname = [i for i in cvts if i.cvterm_id == sp.type_id]
-                    assert(len(spname) == 1)
-                    spname = spname[0].name
-                    m.update({spname : sp.type_id})
-                self.map_stockprop_type_to_cvterm_id = m
+            m = {}
+            sps = self.chado.get_stockprop()
+            cvts = self.chado.get_cvterm()
+            for sp in sps:
+                spname = [i for i in cvts if i.cvterm_id == sp.type_id]
+                assert(len(spname) == 1)
+                spname = spname[0].name
+                m.update({spname : sp.type_id})
+            self.map_stockprop_type_to_cvterm_id = m
 
             def f(sp, current):
                 m_stockid = self.map_stock_name_to_id
@@ -269,7 +262,7 @@ class TableGuru(utility.VerboseQuiet):
             def f2(sp, currents):
                 '''is_in([stock.name, property], [[id1,typ1],[..],..])
 
-                Must be usable like: 
+                Must be usable like:
                     ids = [[i.stock_id i.type_id] for i in chado.get_stockprop()]
                     f([stock,prop_t], ids)
                         -> True if stock,prop_t is already in ids
@@ -277,10 +270,13 @@ class TableGuru(utility.VerboseQuiet):
                 m_stockid = self.map_stock_name_to_id
                 m_propid = self.map_stockprop_type_to_cvterm_id
                 s,p = sp
-                if not m_stockid.has_key(s) or not m_propid.has_key(p):
+                if not m_stockid.has_key(s):
                     return False
+                if not m_propid.has_key(p):
+                    msg = 'No Key: Mapping(:stock_id => :cvterm_id) "{}"'
+                    raise Warning(msg.format(p))
                 s_id = m_stockid[s]
-                p_id = m_propid[s]
+                p_id = m_propid[p]
                 if [s_id, p_id] in currents:
                     return True
                 return False
@@ -362,24 +358,23 @@ class TableGuru(utility.VerboseQuiet):
             current = get_all_func()
 
             # Default to non-override
+            # Both _overrite lists are only used for comparison
             data_override = self.data
             curr_override = current
 
             if tab == 'stockprop':
                 curr_override = [[i.stock_id, i.type_id] for i in current]
-                self.vprint('xxx, current stockprops' + str(curr_override))
                 data_override = []
-                for attr in dir(self.data):
-                    if 'stockprop.' in attr:
+                for attr in dir(self.data[0]):
+                    if self.tr.has_key(attr) and 'stockprop.' in self.tr[attr]:
                         for d in self.data:
                             data_override.append(
-                                [getattr(i, self.tr_inv['stock.name']),
-                                 getattr(i, attr)]
+                                [getattr(d, self.tr_inv['stock.name']),
+                                 self.tr[attr][len('stockprop.'):]]
                             )
             elif tab == 'stock':
                 pass
             else:
-                # Both _overrite lists are only used for comparison
                 curr_override = [p.uniquename for p in self.chado.get_phenotype()]
                 def tmp(d):
                     id = uid(d, self.tr_inv)
@@ -435,8 +430,6 @@ class TableGuru(utility.VerboseQuiet):
                             {ora_attr : getattr(whole_entry, ora_attr)}
                         )
                 except AttributeError as e:
-                    #msg = '[-] getting ."{0}" from {1} failed.\n'
-                    #print msg.format(ora_attr, whole_entry)
                     blacklist.append(ora_attr)
             # Highly unlikely, but if it happens we better tell someone.
             if skip and raw:
@@ -520,23 +513,25 @@ class TableGuru(utility.VerboseQuiet):
             t = self.linker.create_stock(stock_ns, orga, stock_uniqs=stock_us,
                                          germplasm_t=germpl_t)
             return t
-                   
-                   
+
+
 
     def __check_and_add_stockprops(self):
         '''Tasks to upload the stockprop (stock-metadata).
 
         This functions refers to the chado 'stockprop' table.
         '''
-        stockprops = self.__get_needed_data('stockprop')
+        stockprops, raw = self.__get_needed_data('stockprop', raw=True)
         self.vprint('[+] stockprops: {} rows'.format(len(stockprops)))
+        stocks = [getattr(i, self.tr_inv['stock.name']) for i in raw]
 
         if not stockprops:
-            return None
+            return
         t_stockprops = []
         for ora_attr,chad_attr in self.tr.iteritems():
-            prop_t = chad_attr.lstrip('stockprop.')
-            props = [[s, getattr(o, ora_attr)] for s,o in it]
+            if not 'stockprop.' in chad_attr: continue
+            prop_t = chad_attr[len('stockprop.'):]
+            props = [[s, o[chad_attr]] for s,o in zip(stocks, stockprops)]
             t = self.linker.create_stockprop(props, prop_t, tname=prop_t)
             t_stockprops.append(t)
         return t_stockprops
@@ -601,13 +596,8 @@ class TableGuru(utility.VerboseQuiet):
                                    self.tr_inv['nd_geolocation.description'])
                     new.update({'site_name' : name})
                 if 'stockprop' in k:
-                    #k = k.lstrip('stockprop.')
                     value = self.__tostr(getattr(raw_entry, ora_attr))
                     new.update({k : value})
-                    #if 'plant' in k:
-                    #    new.update({'plant_date' : value})
-                    #elif 'pick' in k:
-                    #    new.update({'pick_date' : value})
             others.append(new)
 
         # Get the real phenotyping data into position.
@@ -645,7 +635,7 @@ class TableGuru(utility.VerboseQuiet):
 
     def __get_trait_name(self, trait):
         '''Using self.onto.mapping, we create and return a nice trait name.
-        
+
         If we get a trait name, that does not exist in the Ontology, an empty
         string is returned.
         '''
@@ -706,8 +696,8 @@ class TableGuru(utility.VerboseQuiet):
             round_N += 1
             fetched_cur = len(self.data)
             fetched += fetched_cur
-            print '[+] === upload round {} ==='.format(round_N)
-            print '[+] data: {} rows'.format(fetched_cur)
+            self.vprint('[+] === upload round {} ==='.format(round_N))
+            self.vprint('[+] data: {} rows'.format(fetched_cur))
 
             t = {}
 
@@ -720,7 +710,7 @@ class TableGuru(utility.VerboseQuiet):
             # Replace None values with dummies.
             for k,v in t.iteritems():
                 if v is None:
-                    print '[-] None-Task for {}'.format(k)
+                    self.vprint('[-] None-Task for {}'.format(k))
                     t[k] = utility.Task.init_empty()
 
             # the tasks variable is explained in migration.py -> Task.parallel_upload

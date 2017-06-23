@@ -72,7 +72,7 @@ class Oracledb():
     # Tried to find a bug, didn't work..
     #@property
     #def cur(self):
-    #    print 'XXX accessing cursor @', hex(id(self.c))
+    #    print '[ORACLE] accessing cursor @', hex(id(self.c))
     #    return self.c
 
     def __check_lastheaders(self, table):
@@ -112,7 +112,8 @@ class Oracledb():
             self.lastraw = raw
             data = self.__format(data, table)
         else:
-            print '[get_rows] need table=<> to return non-raw data'
+            msg = 'need kwarg <table> to return non-raw data'
+            raise Warning(msg)
 
         if save_as:
             self.saved_curs.update({save_as : self.cur})
@@ -198,7 +199,6 @@ def main():
         c.execute(sql)
         con.commit()
         print '[+] Exito, mirame imprimiendo row[:15] -> '
-        # Print nicely formatted example values.
         for name, value in zip(c.description[:16], c.fetchone()[:16]):
             print '{0:18} : {1}'.format( name[0], value )
     except cx_Oracle.DatabaseError as e:
