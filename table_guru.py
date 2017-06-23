@@ -203,15 +203,10 @@ class TableGuru(utility.VerboseQuiet):
         if table == 'stock':
             TaskStorage.known_stock_ids = []
             TaskStorage.unknown_stocks = []
+            conf_inv = utility.invert_dict(conf)
             def f(ora, chad):
-                compared_something = False
-                for ora_attr, chad_attr in conf.iteritems():
-                    if 'stock.name' in chad_attr and \
-                            getattr(ora, ora_attr) != chad.uniquename:
-                        return False
-                    if 'stock.name' in chad_attr: compared_something = True
-                if not compared_something:
-                    raise Warning('[stock] compared nothing')
+                if getattr(ora, conf_inv['stock.name']) != chad.uniquename:
+                    return False
                 return True
             def f2(ora, chads):
                 for c in chads:
@@ -219,8 +214,7 @@ class TableGuru(utility.VerboseQuiet):
                         # it's equal, lets append its name to known names
                         TaskStorage.known_stock_ids.append(c.stock_id)
                         return True
-                c_in = utility.invert_dict(conf)
-                ora_stock_name = getattr(ora, c_in['stock.name'])
+                ora_stock_name = getattr(ora, conf_inv['stock.name'])
                 if ora_stock_name in TaskStorage.unknown_stocks:
                     index = TaskStorage.unknown_stocks.index(ora_stock_name)
                     dup = utility.Duplicate(index)
@@ -285,14 +279,9 @@ class TableGuru(utility.VerboseQuiet):
             def f(ora, chad):
                 if chad in ora: return True
                 return False
-            def f2(ora, chads):
+            def f2(ora, chads): # why is ora a set() ? #YYY
                 if ora.intersection(set(chads)): return True
                 return False
-
-        f.__doc__ = 'is_eq(ora, chad) -> True if the oracle entry ora == chad'
-        f2_doc = 'is_in(ora, c) -> True if ora is contained in iterable c'
-        if f2 and not f2.__doc__:
-            f2.__doc__ = f2_doc
 
         return f,f2
 
@@ -306,13 +295,7 @@ class TableGuru(utility.VerboseQuiet):
         conf, c_conf = self.get_config(chado_table=table)
         if not conf: return None, None, None, None
 
-        is_eq, override = self.create_equal_comparison(table, conf, c_conf)
-
-        def is_in(ora, chad_list):
-            for c in chad_list:
-                if is_eq(ora, c): return True
-            return False
-        if override: is_in = override
+        is_eq, is_in = self.create_equal_comparison(table, conf, c_conf)
 
         return is_eq, is_in, conf, c_conf
 
@@ -379,7 +362,7 @@ class TableGuru(utility.VerboseQuiet):
                 def tmp(d):
                     id = uid(d, self.tr_inv)
                     mkuniq = chado.ChadoDataLinker.make_pheno_unique
-                    uniqnames = set(mkuniq(id, t) for t in self.pheno_traits)
+                    uniqnames = set(mkuniq(id, t) for t in self.pheno_traits) # YYY here we do it
                     return uniqnames
                 data_override = [tmp(d) for d in self.data]
 
@@ -542,16 +525,18 @@ class TableGuru(utility.VerboseQuiet):
         This functions refers to the chado 'nd_geolocation' table.
         '''
         sites = self.__get_needed_data('nd_geolocation')
-        self.vprint('[+] sites: {} rows'.format(len(sites)))
 
         if sites:
             # I don't know how this is possible but get duplicates at this point.
             sites = utility.uniq(sites)
+            self.vprint('[+] sites: {} rows'.format(len(sites)))
             mandatory_cvts = ['type', 'country', 'state', 'region', 'address',
                               'site_code']
             t1 = self.__check_and_add_cvterms(mandatory_cvts, f_ext='pre_sites')
             t2 = self.linker.create_geolocation(sites)
             return (t1, t2)
+        else:
+            self.vprint('[+] sites: {} rows'.format(len(sites)))
 
     def __check_and_add_contacts(self):
         '''Creates MCL spreadsheets to upload the contact information.
@@ -665,7 +650,7 @@ class TableGuru(utility.VerboseQuiet):
 
         return TableGuru.TRANS[self.table]
 
-    def create_upload_tasks(self, max_round_fetch=1500, test=None):
+    def create_upload_tasks(self, max_round_fetch=10000, test=None):
         '''Multiplexer for the single rake_{table} functions.
 
         Each create necessary workbooks for the specified table, save them and
@@ -716,7 +701,7 @@ class TableGuru(utility.VerboseQuiet):
             # the tasks variable is explained in migration.py -> Task.parallel_upload
             tasks = (
                 [ t['stocks'], t['sites'], t['contacts'], ],
-                t['phenos'], t['stockprops']
+                [ t['phenos'], t['stockprops'] ],
             )
             yield tasks
 

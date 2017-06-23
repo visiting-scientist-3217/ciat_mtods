@@ -293,7 +293,7 @@ class BigTest(unittest.TestCase):
     # Number of lines imported, this times the number of understood traits
     # should directly correlate to the added rows of phenotyping data in chado.
     # If 'None' all data will be imported.
-    NTEST = 10000
+    NTEST = 20000
 
     def step10_stateful_setup(self):
         self.done_pg_backup = False

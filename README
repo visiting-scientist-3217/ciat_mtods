@@ -7,14 +7,17 @@ Environment:
                     for the connection you will be prompted for the password.
     ORACLEDB_PW     Oracle database password. Same ^ here.
 
-I think its unlikely that this code will be of much use for anyone else (should
-at least be beautifyed/cleaned). Though the Chado API is okay-isch.
+I think its unlikely that this code will be of much use for anyone else, as we
+needed quite a specific translation from one internal database to another.
+But the Chado API is okay-isch.
 
 Configuration:
     trans.conf
+    *oracledb translation tables*
 
 Requirements:
     python2.7
     python-gevent
+    python-psycopg2
     oracle-xe (oracledb library)
     Oracle-cx (python library using oracle-xe)
