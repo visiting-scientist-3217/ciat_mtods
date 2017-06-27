@@ -5,7 +5,7 @@ import chado
 import cassava_ontology
 import ConfigParser
 import os
-import datetime
+import datetime, time
 from task_storage import TaskStorage
 
 # Path to the translation cfg file.
@@ -279,7 +279,7 @@ class TableGuru(utility.VerboseQuiet):
             def f(ora, chad):
                 if chad in ora: return True
                 return False
-            def f2(ora, chads): # why is ora a set() ? #YYY
+            def f2(ora, chads): #set
                 if ora.intersection(set(chads)): return True
                 return False
 
@@ -361,21 +361,15 @@ class TableGuru(utility.VerboseQuiet):
                 curr_override = [p.uniquename for p in self.chado.get_phenotype()]
                 def tmp(d):
                     id = uid(d, self.tr_inv)
-                    mkuniq = chado.ChadoDataLinker.make_pheno_unique
-                    uniqnames = set(mkuniq(id, t) for t in self.pheno_traits) # YYY here we do it
+                    mkuniq = chado.ChadoDataLinker.make_pheno_unique #set
+                    uniqnames = set(mkuniq(id, t) for t in self.pheno_traits)
                     return uniqnames
                 data_override = [tmp(d) for d in self.data]
 
             unknown = []
             for entry,entry_ovrw in zip(self.data, data_override):
-                #msg = '[-] {0} {1} entry: {2}'
-                #id = uid(entry, self.tr_inv)
-                #item = 'id:{0},stock:{1}'.format(id, entry.VARIEDAD)
-                #msg = msg.format('{}',tab,item)
                 if not is_in(entry_ovrw, curr_override) and not entry in unknown:
                     unknown.append(entry)
-                #elif is_in(entry_ovrw, curr_override): self.vprint(msg.format('known'))
-                #elif entry in unknown: self.vprint(msg.format('double'))
         else:
             unknown = self.data
 
@@ -432,6 +426,8 @@ class TableGuru(utility.VerboseQuiet):
         if raw: return needed_data, needed_data_raw
         return needed_data
 
+    # TODO remove this function, and replace its only usage by
+    #      __get_or_create_cvterm
     def __check_and_add_cvterms(self, maybe_known, f_ext=''):
         '''Check if <maybe_known> cvterm-names already exist in Chado.
 
@@ -466,9 +462,6 @@ class TableGuru(utility.VerboseQuiet):
 
         # Check if we have Ontology for all needed cvterms.
         if len(needed_cvts) == len(needed_onto):
-            # TODO add aditional information, like METHOD_NAME,
-            # METHOD_CLASS, SCALE_ID, TRAIT_DESCRIPTION, TRAIT_CLASS, ++
-            # But therefor we need to access Chado manually.
             cvt_ns = [i.TRAIT_NAME for i in needed_onto]
             cvt_ds = ['{cls}: {dsc}'.format(dsc=i.TRAIT_DESCRIPTION,\
                         cls=i.TRAIT_CLASS) for i in needed_onto]
@@ -650,7 +643,7 @@ class TableGuru(utility.VerboseQuiet):
 
         return TableGuru.TRANS[self.table]
 
-    def create_upload_tasks(self, max_round_fetch=10000, test=None):
+    def create_upload_tasks(self, max_round_fetch=400000, test=None):
         '''Multiplexer for the single rake_{table} functions.
 
         Each create necessary workbooks for the specified table, save them and
@@ -681,8 +674,8 @@ class TableGuru(utility.VerboseQuiet):
             round_N += 1
             fetched_cur = len(self.data)
             fetched += fetched_cur
-            self.vprint('[+] === upload round {} ==='.format(round_N))
-            self.vprint('[+] data: {} rows'.format(fetched_cur))
+            msg = '[+] === upload round {} ({}) ==='
+            self.vprint(msg.format(round_N, time.ctime()))
 
             t = {}
 
@@ -713,6 +706,7 @@ class TableGuru(utility.VerboseQuiet):
                                                ord=uniq_col)
             if not self.data:
                 break
+        self.vprint('[+] === the end ({}) ==='.format(time.ctime()))
 
 # Just fill in some empty dict()'s.
 for table in TableGuru.ALL_TABLES:

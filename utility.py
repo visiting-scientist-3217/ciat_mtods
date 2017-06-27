@@ -162,7 +162,7 @@ class Task(VerboseQuiet):
     '''Used for multithreading implementation.'''
     def __init__(self, name, job, *args, **kwargs):
         super(self.__class__, self).__init__()
-        self.VERBOSE = True
+        self.VERBOSE = False
         self.name = name
         self.job = job
         self.args = args

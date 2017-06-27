@@ -468,6 +468,9 @@ class ChadoDataLinker(object):
         t2_cvt = Task(name, f, *args, **kwargs)
         return (t1_dbxref, t2_cvt) # tuple = enforce sequencial execution
 
+    # TODO add definition
+    #      including: TRAIT_NAME, TRAIT_DESCRIPTION
+    #      maybe also : METHOD_NAME, METHOD_CLASS, SCALE_ID, TRAIT_CLASS, ++
     def __get_or_create_cvterm(self, term, acs=None):
         '''Returns the cvterm named <term>, if it does not exist, we create it
         first.
@@ -517,12 +520,12 @@ class ChadoDataLinker(object):
                 i = re.sub(r'([0-9]*)[NE]', '+\\1', i)
                 i = re.sub(r'([0-9]*)[SW]', '-\\1', i)
             except TypeError, ValueError:
-                # Either we found a plain int() or the first
-                # substitution was already successfull, and the second
-                # fails, which is both fine.
+                # Either we found a plain int() or the first substitution was
+                # already successfull, and the second fails, which is both
+                # fine.
                 pass
             finally:
-                if i in ['-','+','']: i = '0'
+                if i in ['-','+','',None]: i = '0'
                 r.append(i)
         return r
 

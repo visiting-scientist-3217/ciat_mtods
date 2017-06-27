@@ -293,7 +293,7 @@ class BigTest(unittest.TestCase):
     # Number of lines imported, this times the number of understood traits
     # should directly correlate to the added rows of phenotyping data in chado.
     # If 'None' all data will be imported.
-    NTEST = 20000
+    NTEST = None
 
     def step10_stateful_setup(self):
         self.done_pg_backup = False
@@ -317,9 +317,9 @@ class BigTest(unittest.TestCase):
         print '-- need rollback'
 
         for task_suite in self.ts_gen:
-            print '\n=== Tasks Start (big test suite) ==='
-            utility.Task.print_tasks(task_suite)
-            print '=== Tasks End (big test suite) ==='
+            #print '\n=== Tasks Start (big test suite) ==='
+            #utility.Task.print_tasks(task_suite)
+            #print '=== Tasks End (big test suite) ==='
             utility.Task.non_parallel_upload(task_suite)
 
     def step20_inside_tests(self):
