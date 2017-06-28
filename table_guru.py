@@ -520,8 +520,7 @@ class TableGuru(utility.VerboseQuiet):
         sites = self.__get_needed_data('nd_geolocation')
 
         if sites:
-            # I don't know how this is possible but get duplicates at this point.
-            sites = utility.uniq(sites)
+            sites = utility.uniq(sites) # needed! but don't know why
             self.vprint('[+] sites: {} rows'.format(len(sites)))
             mandatory_cvts = ['type', 'country', 'state', 'region', 'address',
                               'site_code']
@@ -643,7 +642,7 @@ class TableGuru(utility.VerboseQuiet):
 
         return TableGuru.TRANS[self.table]
 
-    def create_upload_tasks(self, max_round_fetch=400000, test=None):
+    def create_upload_tasks(self, max_round_fetch=600000, test=None):
         '''Multiplexer for the single rake_{table} functions.
 
         Each create necessary workbooks for the specified table, save them and

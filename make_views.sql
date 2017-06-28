@@ -1,9 +1,16 @@
-CREATE OR REPLACE FUNCTION makeTripalVisible ()
+----
+-- Note: 
+--  After execution, one must run the drupal7 cron job, otherwise the enabled
+--  view's might not show up.
+----
+-- TODO use tripal_mviews instead of tripal_views!
+----
+CREATE OR REPLACE FUNCTION makeDatesTripalVisible ()
 RETURNS integer AS $$
 declare
-    base_setup_id integer;
     next_setup_id integer;
-    next_setup_id integer;
+    nextnext_setup_id integer;
+    stock_setup_id integer;
 BEGIN
     -- create views
     CREATE MATERIALIZED VIEW stock_date_plant (stock_id, plant_date) AS
@@ -20,57 +27,74 @@ BEGIN
                 SELECT cvterm_id FROM cvterm WHERE name = 'pick_date'
             );
 
-    -- get setup_ids
-    SELECT setup_id into base_setup_id
-        FROM tripal_views_field
-        ORDER BY setup_id DESC
-        LIMIT 1
-    SELECT (1 + base_setup_id) into next_setup_id;
-    SELECT (2 + base_setup_id) into nextnext_setup_id;
+    -- tell tripal that these tables exist, and get the setup_ids
+    INSERT INTO tripal_views
+            (table_name, name) VALUES ('stock_date_plant', 'Plant Date');
+    SELECT setup_id INTO next_setup_id FROM tripal_views
+        WHERE table_name = 'stock_date_plant' AND name = 'Plant Date';
+    INSERT INTO tripal_views
+            (table_name, name) VALUES ('stock_date_pick', 'Pick Date');
+    SELECT setup_id INTO nextnext_setup_id FROM tripal_views
+        WHERE table_name = 'stock_date_pick' AND name = 'Pick Date';
+    SELECT setup_id INTO stock_setup_id
+        FROM tripal_views_join WHERE base_table = 'stock' LIMIT 1;
 
-    -- link all the things, chado style
+    -- link it, chado style
     INSERT INTO tripal_views_join
         (setup_id, base_table, base_field, left_table, left_field, handler)
         VALUES (
-            next_setup_id, 'stock_date_pick', 'stock_id',
+            next_setup_id, 'stock_date_plant', 'stock_id',
             'stock', 'stock_id', 'views_handler_join'
         );
     INSERT INTO tripal_views_join
         (setup_id, base_table, base_field, left_table, left_field, handler)
         VALUES (
-            nextnext_setup_id, 'stock_date_plant', 'stock_id',
+            nextnext_setup_id, 'stock_date_pick', 'stock_id',
             'stock', 'stock_id', 'views_handler_join'
         );
-    INSERT INTO tripal_views_field
-        VALUES (next_setup_id, 'plant_date', 'Plant Date', 'Stock
-                Plant Date', 'varchar');
-    INSERT INTO tripal_views_field
-        VALUES (next_setup_id, 'stock_id', 'Stock ID', 'Stock
-                Stock ID', 'varchar');
-    INSERT INTO tripal_views_field
-        VALUES (nextnext_setup_id, 'pick_date', 'Pick Date', 'Stock
-                Pick Date', 'varchar');
-    INSERT INTO tripal_views_field
-        VALUES (nextnext_setup_id, 'stock_id', 'Stock ID', 'Stock
-                Stock ID', 'varchar');
+    INSERT INTO tripal_views_join
+            (setup_id, base_table, base_field, left_table, left_field, handler,
+            relationship_only)
+        VALUES
+            (stock_setup_id, 'stock', 'stock_id', 'stock_date_plant',
+            'stock_id', 'views_join', 1);
+    INSERT INTO tripal_views_join
+            (setup_id, base_table, base_field, left_table, left_field, handler,
+            relationship_only)
+        VALUES
+            (stock_setup_id, 'stock', 'stock_id', 'stock_date_pick',
+            'stock_id', 'views_join', 1);
 
-    INSERT INTO tripal_views_join
-        (setup_id, base_table, base_field, left_table, left_field, handler,
-         relationship_only)
-        VALUES (
-            (SELECT setup_id FROM tripal_views_join WHERE base_table='stock'
-             limit 1),
-            'stock', 'stock_id', 'stock_date_plant', 'stock_id', 'views_join', 1
-        );
-    INSERT INTO tripal_views_join
-        (setup_id, base_table, base_field, left_table, left_field, handler,
-         relationship_only)
-        VALUES (
-            (SELECT setup_id FROM tripal_views_join WHERE base_table='stock'
-             limit 1),
-            'stock', 'stock_id', 'stock_date_pick', 'stock_id', 'views_join', 1
-        );
+    -- make the fields accessible
+    INSERT INTO tripal_views_field
+        VALUES (next_setup_id, 'plant_date', 'Plant Date', 'Stock Plant Date',
+                'varchar');
+    INSERT INTO tripal_views_field
+        VALUES (next_setup_id, 'stock_id', 'Stock ID', 'Stock Stock ID',
+                'varchar');
+    INSERT INTO tripal_views_field
+        VALUES (nextnext_setup_id, 'pick_date', 'Pick Date', 'Stock Pick Date',
+                'varchar');
+    INSERT INTO tripal_views_field
+        VALUES (nextnext_setup_id, 'stock_id', 'Stock ID', 'Stock Stock ID',
+                'varchar');
     RETURN next_setup_id;
 END;
 $$ LANGUAGE plpgsql;
 
+-- Undo everything.
+CREATE OR REPLACE FUNCTION makeDatesTripalInvisible ()
+RETURNS integer AS $$
+BEGIN
+    DROP MATERIALIZED VIEW stock_date_pick;
+    DROP MATERIALIZED VIEW stock_date_plant;
+    DELETE FROM tripal_views_join
+        WHERE base_table LIKE 'stock_date_p%'
+            OR left_table LIKE 'stock_date_p%';
+    DELETE FROM tripal_views_field
+        WHERE column_name = ANY(ARRAY['plant_date', 'pick_date']);
+    DELETE FROM tripal_views
+        WHERE table_name = ANY(ARRAY['plant_date', 'pick_date']);
+    RETURN 1;
+END;
+$$ LANGUAGE plpgsql;

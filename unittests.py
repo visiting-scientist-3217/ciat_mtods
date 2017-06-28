@@ -321,6 +321,8 @@ class BigTest(unittest.TestCase):
             #utility.Task.print_tasks(task_suite)
             #print '=== Tasks End (big test suite) ==='
             utility.Task.non_parallel_upload(task_suite)
+        # better not let all the data hang around in memory
+        ConTest.chadodb.con.commit() 
 
     def step20_inside_tests(self):
         if not self.need_rollback:

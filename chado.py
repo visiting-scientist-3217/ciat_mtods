@@ -402,10 +402,6 @@ class ChadoDataLinker(object):
     EXP_STOCK_COLS  = ['nd_experiment_id', 'stock_id', 'type_id']
     EXP_PHENO_COLS  = ['nd_experiment_id', 'phenotype_id']
 
-    # implemented stockprop's which might occur in the phenotyping metadata
-    # TODO put this in the config file!
-    STOCKPROPS = ('pick_date', 'plant_date')
-
     def __init__(self, chado, dbname, cvname):
         self.db = dbname
         self.cv = cvname
@@ -626,7 +622,6 @@ class ChadoDataLinker(object):
         return gs
 
     def __t2_create_experiments(self, ids, descs, others, stocks, tname=None):
-        # TODO remove ids from this func
         ld, lo, li = len(descs), len(others), len(ids)
         if ld != lo or ld != li:
             msg = 'descriptors({}) ?= others({}) ?= ids({})'

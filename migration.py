@@ -21,7 +21,6 @@ class Migration(utility.VerboseQuiet):
         .single(<table>)    migrate <table>
     '''
 
-    # List of Tables, for which a Chado migration is implemented.
     TABLES_MIGRATION_IMPLEMENTED = [
         'VM_RESUMEN_EVAL_AVANZADAS',
     ]
@@ -47,16 +46,15 @@ class Migration(utility.VerboseQuiet):
         '''
         super(self.__class__, self).__init__()
         if not basedir:
-            basedir = self.BASE_DIR
-        else:
-            self.BASE_DIR = basedir
+            if self.BASE_DIR: basedir = self.BASE_DIR
+            else:             basedir = os.getcwd()
+        else: self.BASE_DIR = basedir
         self.VERBOSE = verbose
         self.QUIET = quiet
         self.db = cx_oracle.Oracledb()
         if self.VERBOSE: self.db.debug = True
         self.connection, self.cursor = self.db.connect()
         self.vprint('[+] connected')
-
         self.tg = table_guru.TableGuru('', self.db, self.VERBOSE,
                                        basedir=basedir, **tgargs)
 
