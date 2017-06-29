@@ -280,7 +280,7 @@ class TableGuru(utility.VerboseQuiet):
                 if chad in ora: return True
                 return False
             def f2(ora, chads): #set
-                if ora.intersection(set(chads)): return True
+                if ora.intersection(chads): return True
                 return False
 
         return f,f2
@@ -358,7 +358,7 @@ class TableGuru(utility.VerboseQuiet):
             elif tab == 'stock':
                 pass
             else:
-                curr_override = [p.uniquename for p in self.chado.get_phenotype()]
+                curr_override = set(p.uniquename for p in self.chado.get_phenotype())
                 def tmp(d):
                     id = uid(d, self.tr_inv)
                     mkuniq = chado.ChadoDataLinker.make_pheno_unique #set
@@ -642,7 +642,7 @@ class TableGuru(utility.VerboseQuiet):
 
         return TableGuru.TRANS[self.table]
 
-    def create_upload_tasks(self, max_round_fetch=600000, test=None):
+    def create_upload_tasks(self, max_round_fetch=10000, test=None):
         '''Multiplexer for the single rake_{table} functions.
 
         Each create necessary workbooks for the specified table, save them and
