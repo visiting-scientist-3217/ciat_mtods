@@ -11,12 +11,6 @@ import getpass
 import migration
 import table_guru
 
-PATH='testpath'
-
-# Sanity checks.
-if not os.path.exists(PATH):
-    os.mkdir(PATH)
-
 # Half-Global connections to speed things up a lot.
 # Note that the other test will use these connections.
 class ConTest(unittest.TestCase):
@@ -138,14 +132,6 @@ class PostgreTests(unittest.TestCase):
         self.ora_f2_backup = self.oracle.get_n_more
         self.oracle.get_first_n = lambda *a,**kw: self.data_first_n()
         self.oracle.get_n_more = lambda *a,**kw: self.data_next_n()
-
-       #self.assertTrue(False, 'This test is not implemented yet')
-       #self.t1 = migration.Migration.TABLES_MIGRATION_IMPLEMENTED[0]
-       #self.tg = table_guru.TableGuru(self.t1, self.oracle, basedir=PATH,
-       #                               update=True, verbose=True)
-       #taskgen = self.tg.create_upload_tasks()
-       #for tasksuite in taskgen:
-       #    tasksuite.execute()
 
     #def test_cvterm_tasks(self):
     def test_all_tasks_cuz_spreadsheets_wanted_state(self):
@@ -301,8 +287,8 @@ class BigTest(unittest.TestCase):
         self.done_restore = False
         self.oracle = ConTest.oracledb
         self.t1 = migration.Migration.TABLES_MIGRATION_IMPLEMENTED[0]
-        self.tg = table_guru.TableGuru(self.t1, self.oracle, basedir=PATH,
-                                       update=True, verbose=True)
+        self.tg = table_guru.TableGuru(self.t1, self.oracle, update=True,
+                                       verbose=True)
         self.pgr = PGR()
         self.n_phenos0 = self.__get_pheno_count()
 
