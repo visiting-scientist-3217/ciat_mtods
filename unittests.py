@@ -271,7 +271,7 @@ class OracleTests(unittest.TestCase):
 
 class BigTest(unittest.TestCase):
     '''Monolitic tests, building up some state.'''
-    enableThisMonoliticTestWithLongDuration = True
+    enableThisMonoliticTestWithLongDuration = False
 
     # Append my msg to default msg.
     longMessage = True 
