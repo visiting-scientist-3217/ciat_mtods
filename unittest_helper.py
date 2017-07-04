@@ -8,6 +8,8 @@ try: # Calling drush, we want status and ouput
 except ImportError:
     from subprocess import getstatusoutput
 
+# TODO make that sudo v configurable!
+# TODO {db} needs to be configurable too!
 class PostgreRestorer():
     '''Python Wrapper for the pg_dump and pg_restore cmd-line tools.'''
     c_dump = 'sudo -u postgres pg_dump -Fc {db}'

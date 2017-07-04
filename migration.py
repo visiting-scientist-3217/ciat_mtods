@@ -45,10 +45,10 @@ class Migration(utility.VerboseQuiet):
             quiet       daemon mode, be silent
         '''
         super(self.__class__, self).__init__()
-        if not basedir:
-            if self.BASE_DIR: basedir = self.BASE_DIR
-            else:             basedir = os.getcwd()
-        else: self.BASE_DIR = basedir
+        if basedir:
+            self.BASE_DIR = basedir
+        else:
+            self.BASE_DIR = os.getcwd()
         self.VERBOSE = verbose
         self.QUIET = quiet
         self.db = cx_oracle.Oracledb()
@@ -66,17 +66,14 @@ class Migration(utility.VerboseQuiet):
         table_names = [t[0] for t in table_names]
         return table_names
 
-    def full(self, basedir=BASE_DIR):
+    def full(self):
         '''We call the table migration task for all tables in
         TABLES_MIGRATION_IMPLEMENTED.
-
-        Arguments:
-            basedir     log file location
         '''
-        if not os.path.exists(basedir):
+        if not os.path.exists(self.BASE_DIR):
             msg = '[.full] non existent path "{}"'
-            raise RuntimeError(msg.format(basedir))
-        self.vprint('[+] basedir = "{0}"'.format(basedir))
+            raise RuntimeError(msg.format(self.BASE_DIR))
+        self.vprint('[+] basedir = "{0}"'.format(self.BASE_DIR))
 
         for table in self.__get_tables():
             if table in self.TABLES_MIGRATION_IMPLEMENTED:
