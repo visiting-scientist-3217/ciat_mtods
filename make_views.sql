@@ -39,7 +39,7 @@ BEGIN
     SELECT setup_id INTO stock_setup_id
         FROM tripal_views_join WHERE base_table = 'stock' LIMIT 1;
 
-    -- link it, chado style
+    -- link it, tripal style
     INSERT INTO tripal_views_join
             (setup_id, base_table, base_field, left_table, left_field, handler)
         VALUES
@@ -68,7 +68,7 @@ BEGIN
             (nextnext_setup_id, 'stock_id', 'Stock ID', 'Stock Stock ID',
              'varchar');
 
-    -- select handlers for field/filter/sort
+    -- select default handlers for field/filter/sort
     INSERT INTO tripal_views_handlers
             (setup_id, column_name, handler_type, handler_name, arguments)
         VALUES
