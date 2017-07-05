@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/work/opt/python-2.7.9/bin/python
 import utility # must be first cause of monkey-patching
 import unittest
 import traceback
@@ -15,7 +15,7 @@ import table_guru
 # Note that the other test will use these connections.
 class ConTest(unittest.TestCase):
     # Get Chado-,Oracle -DB connections, and the Ontology
-    chadodb = chado.ChadoPostgres(host='127.0.0.1', usr='drupal7')
+    chadodb = chado.ChadoPostgres(host='127.0.0.1', usr='cassghub')
     linker = chado.ChadoDataLinker(chadodb, 'mcl_pheno', 'mcl_pheno')
     oracledb = cx_oracle.Oracledb()
     oracledb.connect()
@@ -279,7 +279,7 @@ class BigTest(unittest.TestCase):
     # Number of lines imported, this times the number of understood traits
     # should directly correlate to the added rows of phenotyping data in chado.
     # If 'None' all data will be imported.
-    NTEST = None
+    NTEST = 1000
 
     def step10_stateful_setup(self):
         self.done_pg_backup = False

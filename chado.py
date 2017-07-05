@@ -17,8 +17,8 @@ import random
 from task_storage import TaskStorage
 from collections import Counter
 
-DB='drupal7'
-USER='drupal7'
+DB=''
+USER='cassghub'
 HOST='127.0.0.1'
 PORT=5432
 
