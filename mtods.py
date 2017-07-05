@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/work/opt/python-2.7.9/bin/python
 '''\
 MtODS -- _M_igrate _t_he _O_racle _D_atabase _S_tuff
  .. to our Chado schema.
