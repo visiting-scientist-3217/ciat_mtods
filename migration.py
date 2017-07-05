@@ -66,12 +66,9 @@ class Migration(utility.VerboseQuiet):
         table_names = [t[0] for t in table_names]
         return table_names
 
-    def full(self, basedir=BASE_DIR):
+    def full(self):
         '''We call the table migration task for all tables in
         TABLES_MIGRATION_IMPLEMENTED.
-
-        Arguments:
-            basedir     log file location
         '''
         if not os.path.exists(self.BASE_DIR):
             msg = '[.full] non existent path "{}"'

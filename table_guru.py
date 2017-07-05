@@ -280,7 +280,7 @@ class TableGuru(utility.VerboseQuiet):
                 if chad in ora: return True
                 return False
             def f2(ora, chads): #set
-                if ora.intersection(set(chads)): return True
+                if ora.intersection(chads): return True
                 return False
 
         return f,f2
@@ -358,7 +358,7 @@ class TableGuru(utility.VerboseQuiet):
             elif tab == 'stock':
                 pass
             else:
-                curr_override = [p.uniquename for p in self.chado.get_phenotype()]
+                curr_override = set(p.uniquename for p in self.chado.get_phenotype())
                 def tmp(d):
                     id = uid(d, self.tr_inv)
                     mkuniq = chado.ChadoDataLinker.make_pheno_unique #set

@@ -53,7 +53,9 @@ def make_namedtuple_with_query(cursor, query, name, data):
     return make_namedtuple_with_headers(headers, name, data)
 
 def make_namedtuple_with_headers(headers, name, data):
-    NTuple = namedtuple(name, uniq(headers))
+    # we might get non-uniq headers here
+    # TODO find out what happened
+    NTuple = namedtuple(name, uniq(headers)) 
     result = [NTuple(*r) for r in data]
     return result
 
