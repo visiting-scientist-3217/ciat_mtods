@@ -187,6 +187,9 @@ class ChadoPostgres(object):
         args = list(insert_args)
         # replaces values with the constructed join'ed ones
         args[1] = values_constructor(insert_args[1], fetch_res)
+
+        print 'xxx', args[1]
+
         ChadoPostgres.insert_into(*args, **insert_kwargs)
 
     @staticmethod
@@ -541,6 +544,14 @@ class ChadoDataLinker(object):
         t = Task(name, f, *args, **kwargs)
         return [t,]
 
+    def __strip_0time(self, ps):
+        '''strip time from datetime stockprops'''
+        for p in ps:
+            if hasattr(p[1], 'date'):
+                if callable(p[1].date):
+                    p[1] = p[1].date()
+        return ps
+
     def create_stockprop(self, props, ptype='', tname=None):
         '''Create (possibly multiple) Tasks to upload stocks.
 
@@ -556,6 +567,8 @@ class ChadoDataLinker(object):
         '''
         values = ','.join("('{}')".format(p[0]) for p in props)
         stmt = stmt.format(values)
+
+        props = self.__strip_0time(props)
 
         def join_func(content, stmt_res):
             type_id = content[0]

@@ -1,9 +1,8 @@
-'''As we don't know excactly what Mainlab Chado Loader does with our database,
-we just save and rollback the whole test database for our unittests. Sounds
-reasonable.'''
+'''As keeping track of all the data we inter into Chado is tedious, we just
+rollback the whole chado schema.'''
 import os
 import datetime, time
-try: # Calling drush, we want status and ouput
+try:
     from commands import getstatusoutput
 except ImportError:
     from subprocess import getstatusoutput
@@ -13,14 +12,13 @@ except ImportError:
 class PostgreRestorer():
     '''Python Wrapper for the pg_dump and pg_restore cmd-line tools.'''
     c_dump = 'sudo -u postgres pg_dump -Fc {db}'
-    c_drop = 'sudo -u postgres dropdb {db}'
-    c_crea = 'sudo -u postgres createdb {db}'
-    c_res = 'sudo -u postgres pg_restore -j 16 --dbname={db} '
-    #restore_tables = ['stock', 'cvterm', 'cv', 'phenotype', 'nd_geolocation',
-    #                  'nd_experiment', 'nd_experiment_stock',
-    #                  'nd_experiment_phenotype', 'contact']
+    c_drop = 'sudo -u postgres psql {db} -c "DROP SCHEMA chado CASCADE;"'
+    c_crea = 'sudo -u postgres psql {db} -c "CREATE SCHEMA chado;"'
+    c_res = 'sudo -u postgres pg_restore -j 16 --dbname={db} --schema=chado '
+    #c_drop = 'sudo -u postgres dropdb {db}'
+    #c_crea = 'sudo -u postgres createdb {db}'
+    #c_res = 'sudo -u postgres pg_restore -j 16 --dbname={db} '
 
-    # Outside of project folder cuz of paranoia.
     MASTERDUMP = os.path.join(os.path.expanduser('~'), 'ciat', 'ALLDB.dump')
 
     def __init__(self, db='drupal7', basedir='', fname='chado.dump'):
@@ -45,18 +43,24 @@ class PostgreRestorer():
             msg = 'Should renew your {}'.format(self.MASTERDUMP)
             raise Warning(msg)
 
-    #def __mktables(self):
-    #    tabs = map(lambda x: '-t chado.{}'.format(x), self.restore_tables)
-    #    return ' '.join(tabs)
+    def __known_special_case(self, s, o):
+        '''Check status and output for known (ignorable) values.'''
+        lines = o.split('\n')
+        if 'WARNING: errors ignored' in lines[-1]:
+            return True # no problem
+        return False
 
     def __exe_c(self, cmd):
         '''Print execute, and throw on non-0 return value.'''
         cmd = cmd.format(db=self.db)
         s, o = getstatusoutput(cmd)
         if s != 0:
-            msg = 'Could not execute cmd $({cmd}) returned "{val}":\n{out}'
+            msg = '[!] cmd $({cmd}) returned "{val}":\n{out}'
             msg = msg.format(cmd=cmd, out=str(o)[:1000], val=s)
-            raise RuntimeError(msg)
+            if self.__known_special_case(s, o):
+                print '[warning:{0}] {1}'.format(s, msg)
+            else:
+                raise RuntimeError(msg)
         else:
             print '[+] {}'.format(cmd)
         return o

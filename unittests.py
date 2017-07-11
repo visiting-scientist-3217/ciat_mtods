@@ -271,7 +271,7 @@ class OracleTests(unittest.TestCase):
 
 class BigTest(unittest.TestCase):
     '''Monolitic tests, building up some state.'''
-    enableThisMonoliticTestWithLongDuration = False
+    enableThisMonoliticTestWithLongDuration = True
 
     # Append my msg to default msg.
     longMessage = True 
@@ -279,7 +279,7 @@ class BigTest(unittest.TestCase):
     # Number of lines imported, this times the number of understood traits
     # should directly correlate to the added rows of phenotyping data in chado.
     # If 'None' all data will be imported.
-    NTEST = None
+    NTEST = 1000
 
     def step10_stateful_setup(self):
         self.done_pg_backup = False

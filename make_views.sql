@@ -13,14 +13,14 @@ declare
     stock_setup_id integer;
 BEGIN
     -- create views
-    CREATE MATERIALIZED VIEW stock_date_plant (stock_id, plant_date) AS
+    CREATE VIEW stock_date_plant (stock_id, plant_date) AS
         SELECT stock_id, value
             FROM stockprop
             WHERE type_id = (
                 SELECT cvterm_id FROM cvterm WHERE name = 'plant_date'
             );
 
-    CREATE MATERIALIZED VIEW stock_date_pick (stock_id, pick_date) AS
+    CREATE VIEW stock_date_pick (stock_id, pick_date) AS
         SELECT stock_id, value
             FROM stockprop
             WHERE type_id = (
@@ -57,6 +57,9 @@ BEGIN
              'stock_id', 'views_join', 1);
 
     -- make the fields accessible
+    -- Note: This fails sometimes for no obvious reason, and a 2nd execution
+    --       just works fine.
+    -- TODO: find out what happened.
     INSERT INTO tripal_views_field
         VALUES
             (next_setup_id, 'plant_date', 'Plant Date', 'Stock Plant Date',
@@ -99,8 +102,8 @@ declare
     next_setup_id integer;
     nextnext_setup_id integer;
 BEGIN
-    DROP MATERIALIZED VIEW stock_date_pick;
-    DROP MATERIALIZED VIEW stock_date_plant;
+    DROP VIEW stock_date_pick;
+    DROP VIEW stock_date_plant;
     SELECT setup_id INTO next_setup_id FROM tripal_views
         WHERE table_name = 'stock_date_plant' AND name = 'Plant Date';
     SELECT setup_id INTO nextnext_setup_id FROM tripal_views
