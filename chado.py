@@ -187,9 +187,6 @@ class ChadoPostgres(object):
         args = list(insert_args)
         # replaces values with the constructed join'ed ones
         args[1] = values_constructor(insert_args[1], fetch_res)
-
-        print 'xxx', args[1]
-
         ChadoPostgres.insert_into(*args, **insert_kwargs)
 
     @staticmethod
@@ -533,11 +530,23 @@ class ChadoDataLinker(object):
         name = 'geolocation upload'
         if tname: name = name + '({})'.format(tname)
         # Our translator creates this funny format, deal with it.
-        content = [self.__check_coords(i['nd_geolocation.description'],
-                                       i['nd_geolocation.latitude'],
-                                       i['nd_geolocation.longitude'],
-                                       i['nd_geolocation.altitude'])
-                    for i in sites]
+        #content = [self.__check_coords(i['nd_geolocation.description'],
+        #                               i['nd_geolocation.latitude'],
+        #                               i['nd_geolocation.longitude'],
+        #                               i['nd_geolocation.altitude'])
+        #            for i in sites]
+        fail_counter = 0
+        content = []
+        for i in sites:
+            try:
+                content.append(
+                    self.__check_coords(i['nd_geolocation.description'],
+                                        i['nd_geolocation.latitude'],
+                                        i['nd_geolocation.longitude'],
+                                        i['nd_geolocation.altitude']))
+            except KeyError:
+                fail_counter += 1
+        print 'xxx geolocations fails', fail_counter
         args = ('nd_geolocation', content, self.GEOLOC_COLS)
         kwargs = {'cursor' : self.con.cursor()}
         f = self.chado.insert_into
