@@ -506,7 +506,7 @@ class TableGuru(utility.VerboseQuiet):
         for ora_attr,chad_attr in self.tr.iteritems():
             if not 'stockprop.' in chad_attr: continue
             prop_t = chad_attr[len('stockprop.'):]
-            #props = [[s, o[chad_attr]] for s,o in zip(stocks, stockprops)]
+
             props = []
             fail_counter = 0
             for s,o in zip(stocks, stockprops):
@@ -514,7 +514,7 @@ class TableGuru(utility.VerboseQuiet):
                     props.append([s, o[chad_attr]])
                 except KeyError:
                     fail_counter += 1
-            print 'xxx stockprop ({}) fails'.format(prop_t), fail_counter
+
             t = self.linker.create_stockprop(props, prop_t, tname=prop_t)
             t_stockprops.append(t)
         return t_stockprops

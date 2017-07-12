@@ -529,13 +529,9 @@ class ChadoDataLinker(object):
         '''Create (possibly multiple) Tasks to upload geolocations.'''
         name = 'geolocation upload'
         if tname: name = name + '({})'.format(tname)
-        # Our translator creates this funny format, deal with it.
-        #content = [self.__check_coords(i['nd_geolocation.description'],
-        #                               i['nd_geolocation.latitude'],
-        #                               i['nd_geolocation.longitude'],
-        #                               i['nd_geolocation.altitude'])
-        #            for i in sites]
-        fail_counter = 0
+
+        # counting for fun, last run got 2 fails for 300k+ rows
+        fail_counter = 0 
         content = []
         for i in sites:
             try:
@@ -546,7 +542,7 @@ class ChadoDataLinker(object):
                                         i['nd_geolocation.altitude']))
             except KeyError:
                 fail_counter += 1
-        print 'xxx geolocations fails', fail_counter
+
         args = ('nd_geolocation', content, self.GEOLOC_COLS)
         kwargs = {'cursor' : self.con.cursor()}
         f = self.chado.insert_into
