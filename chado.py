@@ -133,7 +133,11 @@ class ChadoPostgres(object):
                         RETURNING column <a> of the insert statement into
                         TaskStorage.b
         '''
-        if len(values) == 0: raise RuntimeError('No values to upload')
+        if len(values) == 0:
+            print '[Warning] No values to upload for {}'.format(table)
+            if store:
+                setattr(TaskStorage, store[1], [])
+            return
         if not type(values[0]) in [list, tuple]:
             msg = 'expected values = [[...], [...], ...]\n\tbut received: {}'
             msg = msg.format(str(values)[:50])
@@ -715,8 +719,10 @@ class ChadoDataLinker(object):
 
         # -- phenotypes --
         def join_pheno_func(ids, ts):
-            if len(ids) == len(set(ids)):
-                raise Warning('Only one phenotype per data line? Unlikely!')
+            # Earlier this meant that we might have failed parsing Ontology
+            # and/or configuration, which is no longer a problem.
+            #if len(ids) == len(set(ids)):
+            #    raise Warning('Only one phenotype per data line? Unlikely!')
             eid_iter = iter(ts.nd_experiment_ids)
             pid_iter = iter(ts.phenotype_ids)
             test_iter = iter(ids)
