@@ -117,7 +117,8 @@ class PostgreSQLQueries():
     column_names = '''\
         SELECT table_name, column_name
             FROM information_schema.columns
-            WHERE table_name='{table}'\
+            WHERE table_name='{table}'
+            ORDER BY ordinal_position\
     '''
     select_linked_phenotype = '''\
         SELECT {select} FROM nd_experiment AS e

@@ -276,10 +276,8 @@ class BigTest(unittest.TestCase):
     # Append my msg to default msg.
     longMessage = True 
 
-    # Number of lines imported, this times the number of understood traits
-    # should directly correlate to the added rows of phenotyping data in chado.
-    # If 'None' all data will be imported.
-    NTEST = 1000
+    # Number of Oracle rows used. If 'None' all data will be imported.
+    NTEST = None
 
     def step10_stateful_setup(self):
         self.done_pg_backup = False

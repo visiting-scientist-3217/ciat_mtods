@@ -133,7 +133,11 @@ class ChadoPostgres(object):
                         RETURNING column <a> of the insert statement into
                         TaskStorage.b
         '''
-        if len(values) == 0: raise RuntimeError('No values to upload')
+        if len(values) == 0:
+            print '[Warning] No values to upload for {}'.format(table)
+            if store:
+                setattr(TaskStorage, store[1], [])
+            return
         if not type(values[0]) in [list, tuple]:
             msg = 'expected values = [[...], [...], ...]\n\tbut received: {}'
             msg = msg.format(str(values)[:50])
@@ -529,17 +533,33 @@ class ChadoDataLinker(object):
         '''Create (possibly multiple) Tasks to upload geolocations.'''
         name = 'geolocation upload'
         if tname: name = name + '({})'.format(tname)
-        # Our translator creates this funny format, deal with it.
-        content = [self.__check_coords(i['nd_geolocation.description'],
-                                       i['nd_geolocation.latitude'],
-                                       i['nd_geolocation.longitude'],
-                                       i['nd_geolocation.altitude'])
-                    for i in sites]
+
+        # counting for fun, last run got 2 fails for 300k+ rows
+        fail_counter = 0 
+        content = []
+        for i in sites:
+            try:
+                content.append(
+                    self.__check_coords(i['nd_geolocation.description'],
+                                        i['nd_geolocation.latitude'],
+                                        i['nd_geolocation.longitude'],
+                                        i['nd_geolocation.altitude']))
+            except KeyError:
+                fail_counter += 1
+
         args = ('nd_geolocation', content, self.GEOLOC_COLS)
         kwargs = {'cursor' : self.con.cursor()}
         f = self.chado.insert_into
         t = Task(name, f, *args, **kwargs)
         return [t,]
+
+    def __strip_0time(self, ps):
+        '''strip time from datetime stockprops'''
+        for p in ps:
+            if hasattr(p[1], 'date'):
+                if callable(p[1].date):
+                    p[1] = p[1].date()
+        return ps
 
     def create_stockprop(self, props, ptype='', tname=None):
         '''Create (possibly multiple) Tasks to upload stocks.
@@ -556,6 +576,8 @@ class ChadoDataLinker(object):
         '''
         values = ','.join("('{}')".format(p[0]) for p in props)
         stmt = stmt.format(values)
+
+        props = self.__strip_0time(props)
 
         def join_func(content, stmt_res):
             type_id = content[0]
@@ -697,8 +719,10 @@ class ChadoDataLinker(object):
 
         # -- phenotypes --
         def join_pheno_func(ids, ts):
-            if len(ids) == len(set(ids)):
-                raise Warning('Only one phenotype per data line? Unlikely!')
+            # Earlier this meant that we might have failed parsing Ontology
+            # and/or configuration, which is no longer a problem.
+            #if len(ids) == len(set(ids)):
+            #    raise Warning('Only one phenotype per data line? Unlikely!')
             eid_iter = iter(ts.nd_experiment_ids)
             pid_iter = iter(ts.phenotype_ids)
             test_iter = iter(ids)

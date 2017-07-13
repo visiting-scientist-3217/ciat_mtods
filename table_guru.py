@@ -84,9 +84,9 @@ class TableGuru(utility.VerboseQuiet):
     def __error_checks(self):
         msg = 'TableGuru: Mandatory {0} not found: {1}'
         if not self.cvname in [i.name for i in self.chado.get_cv()]:
-            raise RuntimeError(msg.format('cv', chado_cv))
+            raise RuntimeError(msg.format('cv', self.cvname))
         if not self.dbname in [i.name for i in self.chado.get_db()]:
-            raise RuntimeError(msg.format('db', chado_db))
+            raise RuntimeError(msg.format('db', self.dbname))
         if not self.dataset in [i.name for i in self.chado.get_project()]:
             raise RuntimeError(msg.format('project/dataset', chado_dataset))
 
@@ -341,7 +341,7 @@ class TableGuru(utility.VerboseQuiet):
             current = get_all_func()
 
             # Default to non-override
-            # Both _overrite lists are only used for comparison
+            # Both _override lists are only used for comparison
             data_override = self.data
             curr_override = current
 
@@ -361,7 +361,7 @@ class TableGuru(utility.VerboseQuiet):
                 curr_override = set(p.uniquename for p in self.chado.get_phenotype())
                 def tmp(d):
                     id = uid(d, self.tr_inv)
-                    mkuniq = chado.ChadoDataLinker.make_pheno_unique #set
+                    mkuniq = chado.ChadoDataLinker.make_pheno_unique #returns set
                     uniqnames = set(mkuniq(id, t) for t in self.pheno_traits)
                     return uniqnames
                 data_override = [tmp(d) for d in self.data]
@@ -389,33 +389,32 @@ class TableGuru(utility.VerboseQuiet):
         if raw: needed_data_raw = []
         for whole_entry in unknown:
             entry = {}
-            if raw: needed_data_raw.append(whole_entry)
 
             skip = True
             for ora_attr,cha_attr in trg.iteritems():
                 if ora_attr in blacklist:
                     continue
-                skip = False
                 try:
                     # See __doc__
+                    value = getattr(whole_entry, ora_attr)
+                    if value == None: # eq (null) in oracle
+                        continue
                     if mapping == 'chado':
                         entry.update(
-                            {cha_attr : getattr(whole_entry, ora_attr)}
+                            {cha_attr : value}
                         )
                     elif mapping == 'oracle':
                         entry.update(
-                            {ora_attr : getattr(whole_entry, ora_attr)}
+                            {ora_attr : value}
                         )
+                    skip = False
                 except AttributeError as e:
                     blacklist.append(ora_attr)
-            # Highly unlikely, but if it happens we better tell someone.
-            if skip and raw:
-                msg = ' skipped a hole data-line, while also returning raw'\
-                    + ' data. This might lead to corrupting between 1 and'\
-                    + ' every line after this one!'
-                raise RuntimeError(msg)
 
-            needed_data.append(entry)
+            if not skip:
+                needed_data.append(entry)
+                if raw:
+                    needed_data_raw.append(whole_entry)
 
         if blacklist:
             msg = '[blacklist:{tab}] Consider fixing these entries in the'\
@@ -507,7 +506,15 @@ class TableGuru(utility.VerboseQuiet):
         for ora_attr,chad_attr in self.tr.iteritems():
             if not 'stockprop.' in chad_attr: continue
             prop_t = chad_attr[len('stockprop.'):]
-            props = [[s, o[chad_attr]] for s,o in zip(stocks, stockprops)]
+
+            props = []
+            fail_counter = 0
+            for s,o in zip(stocks, stockprops):
+                try:
+                    props.append([s, o[chad_attr]])
+                except KeyError:
+                    fail_counter += 1
+
             t = self.linker.create_stockprop(props, prop_t, tname=prop_t)
             t_stockprops.append(t)
         return t_stockprops
