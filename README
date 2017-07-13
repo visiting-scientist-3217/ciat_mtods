@@ -1,0 +1,24 @@
+We need to repeatedly update a Chado schema, with data from an OracleDB. This
+is the code for the updater, intended to run via cron. 
+The Chado API is okay-isch. Remember when reading the code, that the the main
+goal here was runtime.
+Run ./mtods.py -h and mtods will tell you how to use it.
+
+Environment:
+    POSTGRES_PW     Postgres database password. If not existent, but necessary
+                    for the connection you will be prompted for the password.
+    ORACLEDB_PW     Oracle database password. Same ^ here.
+
+
+Configuration:
+    trans.conf
+    *oracledb translation tables*
+
+Requirements:
+    python2.7
+    python-gevent
+    python-psycopg2
+
+    oracle-instaclient (oracledb library, proprietary, V11.2 or newer)
+
+    cx_Oracle (python library using oracle client libraries)
