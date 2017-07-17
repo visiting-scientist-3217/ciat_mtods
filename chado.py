@@ -727,10 +727,13 @@ class ChadoDataLinker(object):
             pid_iter = iter(ts.phenotype_ids)
             test_iter = iter(ids)
 
-            last_id = next(test_iter)
-            eid = next(eid_iter)
-            pid = next(pid_iter)
             r = []
+            try:
+                last_id = next(test_iter)
+                eid = next(eid_iter)
+                pid = next(pid_iter)
+            except StopIteration:
+                return r
             while True:
                 try:
                     # only if we have a new row id we go to the next experiment

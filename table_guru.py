@@ -239,11 +239,11 @@ class TableGuru(utility.VerboseQuiet):
                 assert(len(spname) == 1)
                 spname = spname[0].name
                 m.update({spname : sp.type_id})
-            self.map_stockprop_type_to_cvterm_id = m
+            self.map_stockprop_name_to_stockprop_type_id = m
 
             def f(sp, current):
                 m_stockid = self.map_stock_name_to_id
-                m_propid = self.map_stockprop_type_to_cvterm_id
+                m_propid = self.map_stockprop_name_to_stockprop_type_id
                 s,p = sp
                 if not m_stockid.has_key(s) or not m_propid.has_key(p):
                     return False
@@ -262,7 +262,7 @@ class TableGuru(utility.VerboseQuiet):
                         -> True if stock,prop_t is already in ids
                 '''
                 m_stockid = self.map_stock_name_to_id
-                m_propid = self.map_stockprop_type_to_cvterm_id
+                m_propid = self.map_stockprop_name_to_stockprop_type_id
                 s,p = sp
                 if not m_stockid.has_key(s):
                     return False

@@ -2,7 +2,7 @@
     - base classes
     - SQL Querie namespaces
     - commonly used functions
-    - ?
+    - the Task class
 '''
 
 # So psycopg2 is level 2 threadsave, but our std-lib is not. Here you see the
@@ -219,8 +219,11 @@ class Task(VerboseQuiet):
                 a and b will be uploaded parallelly
                 and [a,b] will be uploaded before c
 
-        Realistically we can only parallelize stocks and sites and contacts.
-            => ([stocks, sites, ?], phenotypes)
+        Note: 
+	    This feature was added while still using MCL spreadsheet upload. At
+	    that time the upload itself was the bottleneck. After discarding
+	    MCL, this changed now to the uniqe comparisons, and thus rendered
+	    paralellization while uploading effectively useless.
         '''
         if type(tasks) == tuple:
             for t in tasks:
