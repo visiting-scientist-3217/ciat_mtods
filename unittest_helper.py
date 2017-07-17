@@ -19,7 +19,7 @@ class PostgreRestorer():
     #c_crea = 'createdb {db}'
     #c_res = 'pg_restore -j 16 --dbname={db} '
 
-    MASTERDUMP = os.path.join(os.path.expanduser('~'), 'ciat', 'ALLDB.dump')
+    MASTERDUMP = os.path.join(os.path.expanduser('~'), 'software', 'mtods', 'ALLDB.dump')
 
     def __init__(self, db='cassghub', basedir='', fname='chado.dump'):
         self.basedir = basedir
