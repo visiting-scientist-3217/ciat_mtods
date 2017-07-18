@@ -1,0 +1,16 @@
+DELETE FROM db;
+DELETE FROM cv;
+DELETE FROM cvterm;
+DELETE FROM dbxref;
+DELETE FROM project;
+DELETE FROM study;
+DELETE FROM genotype;
+DELETE FROM contact;
+DELETE FROM stock;
+DELETE FROM stockprop;
+DELETE FROM phenotype;
+DELETE FROM nd_experiment;
+DELETE FROM nd_experiment_phenotype;
+DELETE FROM nd_experiment_stock;
+DELETE FROM nd_geolocation;
+DELETE FROM organism;

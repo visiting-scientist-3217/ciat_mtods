@@ -507,6 +507,18 @@ class TableGuru(utility.VerboseQuiet):
             if not 'stockprop.' in chad_attr: continue
             prop_t = chad_attr[len('stockprop.'):]
 
+            # lets find that non-uniq BEGIN
+            if len(stocks) != len(stockprops):
+                print 'len(stocks:%s) != len(stockprops:%s)' %
+                    (len(stocks), len(stockprops))
+            if len(set(stocks)) != len(stocks):
+                print 'len(set(stocks:%s)) != len(stocks:%s)' %
+                    (len(set(stocks)), len(stocks))
+            if len(set(stockprops)) != len(stockprops):
+                print 'len(utility.uniq(stockprops:%s)) != len(stockprops:%s)' %
+                    (len(utility.uniq(stockprops)), len(stockprops))
+            # lets find that non-uniq END
+
             props = []
             fail_counter = 0
             for s,o in zip(stocks, stockprops):
