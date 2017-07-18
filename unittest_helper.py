@@ -7,17 +7,16 @@ try:
 except ImportError:
     from subprocess import getstatusoutput
 
+PJ_PATH = os.path.dirname(sys.argv[0])
+
 # TODO make that sudo v configurable!
 # TODO {db} needs to be configurable too!
 class PostgreRestorer():
     '''Python Wrapper for the pg_dump and pg_restore cmd-line tools.'''
     c_dump = 'pg_dump -Fc {db}'
-    c_drop = 'psql {db} -c "DROP SCHEMA chado CASCADE;"'
-    c_crea = 'psql {db} -c "CREATE SCHEMA chado;"'
-    c_res = 'pg_restore -j 16 --dbname={db} --schema=chado '
-    #c_drop = 'dropdb {db}'
-    #c_crea = 'createdb {db}'
-    #c_res = 'pg_restore -j 16 --dbname={db} '
+    c_drop = 'psql {db} < '+PJ_PATH+'/sql/delete.sql'
+    c_crea = ':' # dummy, cause no need for this any longer
+    c_res = 'pg_restore -j 16 --schema=chado --dbname={db} '
 
     MASTERDUMP = os.path.join(os.path.expanduser('~'), 'software', 'mtods', 'ALLDB.dump')
 
@@ -84,7 +83,14 @@ class PostgreRestorer():
                     self.__exe_c(self.c_crea)
                     crea_success = True
                 if not res_success:
-                    self.__exe_c(self.c_res + self.dumpfile)
+                    self.__exe_c(self.c_res + self.dumpfile) # does not work!
+                    # but it should work.. 
+                    self.__exe_c(self.c_res + self.dumpfile) # does work sometimes!
+                    # but no still not reliable..
+                    self.__exe_c(self.c_res + self.dumpfile) # fixed!
+                    # Speculations what happened here:
+                    #  - pg_restore tool can't handle chado's complexity
+                    #  - ?
                     res_success = True
                 break
             except Exception as e:

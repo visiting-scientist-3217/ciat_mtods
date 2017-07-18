@@ -122,6 +122,9 @@ class Oracledb():
         return data
 
     def __get_tab_from_kwargs(self, kwargs):
+	'''Returns kwargs['table'] if that key exists, otherwise return
+	self.lasttable.
+	'''
         if kwargs.has_key('table'):
             table = kwargs['table']
         elif hasattr(self, 'lasttable'):
@@ -131,14 +134,16 @@ class Oracledb():
         return table
 
     def get_first_n(self, sql, n, **kwargs):
-        '''additional **kwargs will be used to sql.format(**kwargs)'''
+	'''Get first N formatted items from the given query.
+	Additional **kwargs will be used to sql.format(**kwargs).'''
         sql = (sql + OSQL.first_N_only).format(N=n, **kwargs)
         self.cur.execute(sql)
         table = self.__get_tab_from_kwargs(kwargs)
         return self.__format(self.cur.fetchall(), table)
 
     def get_n_more(self, sql, n, offset=0, **kwargs):
-        '''additional **kwargs will be used to sql.format(**kwargs)'''
+	'''Get N more formatted items using offset from the given query.
+	Additional **kwargs will be used to sql.format(**kwargs).'''
         sql = (sql + OSQL.offset_O_fetch_next_N).format(N=n, O=offset, **kwargs)
         self.cur.execute(sql)
         table = self.__get_tab_from_kwargs(kwargs)
