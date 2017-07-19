@@ -509,13 +509,13 @@ class TableGuru(utility.VerboseQuiet):
 
             # lets find that non-uniq BEGIN
             if len(stocks) != len(stockprops):
-                print 'len(stocks:%s) != len(stockprops:%s)' %
+                print 'len(stocks:%s) != len(stockprops:%s)' % \
                     (len(stocks), len(stockprops))
             if len(set(stocks)) != len(stocks):
-                print 'len(set(stocks:%s)) != len(stocks:%s)' %
+                print 'len(set(stocks:%s)) != len(stocks:%s)' % \
                     (len(set(stocks)), len(stocks))
-            if len(set(stockprops)) != len(stockprops):
-                print 'len(utility.uniq(stockprops:%s)) != len(stockprops:%s)' %
+            if len(utility.uniq(stockprops)) != len(stockprops):
+                print 'len(utility.uniq(stockprops:%s)) != len(stockprops:%s)' % \
                     (len(utility.uniq(stockprops)), len(stockprops))
             # lets find that non-uniq END
 
