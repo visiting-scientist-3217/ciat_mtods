@@ -69,9 +69,8 @@ class TableGuru(utility.VerboseQuiet):
         self.c = oracledb.cur
         self.chado = chado.ChadoPostgres()
         self.onto = cassava_ontology.CassavaOntology(self.c)
-
-        self.linker = chado.ChadoDataLinker(self.chado, chado_db, chado_cv)
-
+        self.linker = chado.ChadoDataLinker(self.chado, chado_db, chado_cv,
+                                            self.onto)
         self.table = table
         self.dbname = chado_db
         self.cvname = chado_cv
