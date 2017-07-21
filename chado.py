@@ -406,12 +406,13 @@ class ChadoDataLinker(object):
     EXP_STOCK_COLS  = ['nd_experiment_id', 'stock_id', 'type_id']
     EXP_PHENO_COLS  = ['nd_experiment_id', 'phenotype_id']
 
-    def __init__(self, chado, dbname, cvname):
+    def __init__(self, chado, dbname, cvname, onto=None):
         self.db = dbname
         self.cv = cvname
         self.chado = chado
         self.con = chado.con
         self.c = self.con.cursor()
+        self.onto = onto
 
     def create_cvterm(self, cvterm, accession=[], definition=[], tname=None):
         '''Create (possibly multiple) Tasks to upload cvterms.'''
@@ -438,11 +439,27 @@ class ChadoDataLinker(object):
         else:
             t1_dbxref = Task.init_empty()
 
+        # Note: This is ugly.. we omitted the definition finding in the
+        # TableGuru, now we have to insert it here..
+        if not definition and self.onto:
+            definition = []
+            fmt = 'Trait Description: {0}\nMethod Description: {1}'
+            get_desc = lambda x: fmt.format(x[0].TRAIT_DESCRIPTION,
+                                            x[0].METHOD_DESCRIPTION)
+            get_trait = lambda x: x[0].TRAIT_NAME
+            for cvt in cvterm:
+                it = self.onto.mapping.iteritems()
+                t = [get_desc(j) for _,j in it if get_trait(j) == cvt]
+                try:
+                    idef = t[0]
+                except IndexError:
+                    idef = ''
+                definition.append(idef)
+
         # Note: Scary code. We don't know dbxref_id's but still want to use
         # the copy_from upload, or at least an execute query that uploads all
         # our data at once, and not upload 1 dbxref, 1 cvterm at a time.
-
-        # cvterm names will be added later to <content> in order to ensure
+        # Cvterm names will be added later to <content> in order to ensure
         # correct ordering, because we don't know the dbxref_id yet
         if definition:
             content = [[cv_id, de] for c,de in zip(cvterm, definition)] 
@@ -727,10 +744,13 @@ class ChadoDataLinker(object):
             pid_iter = iter(ts.phenotype_ids)
             test_iter = iter(ids)
 
-            last_id = next(test_iter)
-            eid = next(eid_iter)
-            pid = next(pid_iter)
             r = []
+            try:
+                last_id = next(test_iter)
+                eid = next(eid_iter)
+                pid = next(pid_iter)
+            except StopIteration:
+                return r
             while True:
                 try:
                     # only if we have a new row id we go to the next experiment

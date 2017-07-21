@@ -38,16 +38,23 @@ class CassavaOntology():
 
     Members:
         onto_sp     Spanish raw ontology
+
         onto        English ontology (+cvterm meta info)
+
         mapping     Mapping of the spanish ontology names to a list of all
                     corresponding cvterms as VOntology() objects.
+                    This is done by joining the
+                    ontology_spanish.VARIABLE_ID_BMS on ontology.VARIABLE_ID
+                    and mapping ontology to: ontology.TRAIT_ID .SCALE_ID and
+                    METHOD_ID
     '''
+
 
     SPANISH_ONTOLOGY_TABLE = 'V_ONTOLOGY_SPANISH'
     ONTOLOGY_TABLE = 'V_ONTOLOGY'
 
     def __init__(self, cursor):
-        '''We need that cursor to the db holding chado.'''
+        '''We need that cursor to the db holding the Ontology.'''
         self.c = cursor
         self.onto_sp = get_tabledata_as_tuple(self.c,
             self.SPANISH_ONTOLOGY_TABLE)
@@ -100,11 +107,3 @@ class CassavaOntology():
             d.update({normalized_name : 'phenotype.value'})
         return d
 
-# So we need to join the ontology_spanish.VARIABLE_ID_BMS on
-# ontology.VARIABLE_ID and after that we should be able to self join ontology
-# on: ontology.TRAIT_ID .SCALE_ID and METHOD_ID
-
-# 'select * from V_ONTOLOGY_SPANISH vos inner join V_ONTOLOGY vo on'\
-# +'vos.VARIABLE_ID_BMS = vo.SCALE_ID order by vo.TRAIT_NAME'
-
-# But we did this in python, see CassavaOntology(cursor).mapping

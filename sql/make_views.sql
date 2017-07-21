@@ -102,8 +102,8 @@ declare
     next_setup_id integer;
     nextnext_setup_id integer;
 BEGIN
-    DROP VIEW stock_date_pick;
-    DROP VIEW stock_date_plant;
+    DROP VIEW IF EXISTS stock_date_pick;
+    DROP VIEW IF EXISTS stock_date_plant;
     SELECT setup_id INTO next_setup_id FROM tripal_views
         WHERE table_name = 'stock_date_plant' AND name = 'Plant Date';
     SELECT setup_id INTO nextnext_setup_id FROM tripal_views

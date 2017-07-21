@@ -1,4 +1,5 @@
 #!/usr/bin/python
+'''Script to reset the chado schema; asuming the existence of "chado.dump".'''
 import unittest_helper
 try:
     p = unittest_helper.PostgreRestorer()

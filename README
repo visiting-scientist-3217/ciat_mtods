@@ -12,7 +12,11 @@ Environment:
 
 Configuration:
     trans.conf
+        - See 'trans.conf' comments for syntax clarification.
     *oracledb translation tables*
+        - One contains spanish names, and refers to the other, containing trait
+          information in english.
+          See 'cassava_ontology.py'.
 
 Requirements:
     python2.7

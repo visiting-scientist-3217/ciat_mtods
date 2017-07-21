@@ -69,9 +69,8 @@ class TableGuru(utility.VerboseQuiet):
         self.c = oracledb.cur
         self.chado = chado.ChadoPostgres()
         self.onto = cassava_ontology.CassavaOntology(self.c)
-
-        self.linker = chado.ChadoDataLinker(self.chado, chado_db, chado_cv)
-
+        self.linker = chado.ChadoDataLinker(self.chado, chado_db, chado_cv,
+                                            self.onto)
         self.table = table
         self.dbname = chado_db
         self.cvname = chado_cv
@@ -239,11 +238,11 @@ class TableGuru(utility.VerboseQuiet):
                 assert(len(spname) == 1)
                 spname = spname[0].name
                 m.update({spname : sp.type_id})
-            self.map_stockprop_type_to_cvterm_id = m
+            self.map_stockprop_name_to_stockprop_type_id = m
 
             def f(sp, current):
                 m_stockid = self.map_stock_name_to_id
-                m_propid = self.map_stockprop_type_to_cvterm_id
+                m_propid = self.map_stockprop_name_to_stockprop_type_id
                 s,p = sp
                 if not m_stockid.has_key(s) or not m_propid.has_key(p):
                     return False
@@ -262,7 +261,7 @@ class TableGuru(utility.VerboseQuiet):
                         -> True if stock,prop_t is already in ids
                 '''
                 m_stockid = self.map_stock_name_to_id
-                m_propid = self.map_stockprop_type_to_cvterm_id
+                m_propid = self.map_stockprop_name_to_stockprop_type_id
                 s,p = sp
                 if not m_stockid.has_key(s):
                     return False
@@ -506,6 +505,18 @@ class TableGuru(utility.VerboseQuiet):
         for ora_attr,chad_attr in self.tr.iteritems():
             if not 'stockprop.' in chad_attr: continue
             prop_t = chad_attr[len('stockprop.'):]
+
+            # lets find that non-uniq BEGIN
+            if len(stocks) != len(stockprops):
+                print 'len(stocks:%s) != len(stockprops:%s)' % \
+                    (len(stocks), len(stockprops))
+            if len(set(stocks)) != len(stocks):
+                print 'len(set(stocks:%s)) != len(stocks:%s)' % \
+                    (len(set(stocks)), len(stocks))
+            if len(utility.uniq(stockprops)) != len(stockprops):
+                print 'len(utility.uniq(stockprops:%s)) != len(stockprops:%s)' % \
+                    (len(utility.uniq(stockprops)), len(stockprops))
+            # lets find that non-uniq END
 
             props = []
             fail_counter = 0
