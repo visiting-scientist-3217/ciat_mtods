@@ -7,7 +7,9 @@ try:
 except ImportError:
     from subprocess import getstatusoutput
 
+import sys
 PJ_PATH = os.path.dirname(sys.argv[0])
+del sys
 
 # TODO make that sudo v configurable!
 # TODO {db} needs to be configurable too!

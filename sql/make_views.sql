@@ -13,15 +13,14 @@ declare
     stock_setup_id integer;
 BEGIN
     -- create views
-    -- 'public.' is important here, as we drop the chado schema from time to time
-    CREATE VIEW public.stock_date_plant (stock_id, plant_date) AS
+    CREATE VIEW stock_date_plant (stock_id, plant_date) AS
         SELECT stock_id, value
             FROM stockprop
             WHERE type_id = (
                 SELECT cvterm_id FROM cvterm WHERE name = 'plant_date'
             );
 
-    CREATE VIEW public.stock_date_pick (stock_id, pick_date) AS
+    CREATE VIEW stock_date_pick (stock_id, pick_date) AS
         SELECT stock_id, value
             FROM stockprop
             WHERE type_id = (

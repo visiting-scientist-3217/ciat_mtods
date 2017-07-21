@@ -54,7 +54,7 @@ class CassavaOntology():
     ONTOLOGY_TABLE = 'V_ONTOLOGY'
 
     def __init__(self, cursor):
-        '''We need that cursor to the db holding chado.'''
+        '''We need that cursor to the db holding the Ontology.'''
         self.c = cursor
         self.onto_sp = get_tabledata_as_tuple(self.c,
             self.SPANISH_ONTOLOGY_TABLE)
