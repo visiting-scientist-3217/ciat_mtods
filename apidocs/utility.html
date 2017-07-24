@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+          "DTD/xhtml1-strict.dtd">
+<html>
+  <head>
+    <title>utility : API documentation</title>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+    <link href="apidocs.css" type="text/css" rel="stylesheet" />
+    
+    
+  </head>
+  <body>
+    <h1 class="module">utility : module documentation</h1>
+    <p>
+      <span id="part"></span>
+      
+      
+    </p>
+    <div>
+      
+    </div>
+    <div class="docstring">
+      <div><pre class="literalblock">
+Utility includes:
+- base classes
+- SQL Querie namespaces
+- commonly used functions
+- the Task class
+
+</pre><table class="fieldTable"></table></div>
+    </div>
+
+    
+    <div id="splitTables">
+      <table class="children sortable" id="id18">
+  
+  
+  <tr class="class">
+    
+    
+    <td>Class</td>
+    <td><a href="utility.Duplicate.html">Duplicate</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="function">
+    
+    
+    <td>Function</td>
+    <td><a href="utility.html#invert_dict">invert_dict</a></td>
+    <td><span><pre class="literalblock">
+Switch keys with values in a dict, in case of duplicate values, behaviour is undefined.
+
+</pre></span></td>
+  </tr><tr class="function">
+    
+    
+    <td>Function</td>
+    <td><a href="utility.html#get_uniq_id">get_uniq_id</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="function">
+    
+    
+    <td>Function</td>
+    <td><a href="utility.html#make_namedtuple_with_query">make_namedtuple_with_query</a></td>
+    <td><span><pre class="literalblock">
+Return &lt;data&gt; as a named tuple, called &lt;name&gt;.
+
+</pre></span></td>
+  </tr><tr class="function">
+    
+    
+    <td>Function</td>
+    <td><a href="utility.html#make_namedtuple_with_headers">make_namedtuple_with_headers</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="function">
+    
+    
+    <td>Function</td>
+    <td><a href="utility.html#normalize">normalize</a></td>
+    <td><span><pre class="literalblock">
+Some string substitutions, to make it a valid Attribute.
+
+</pre></span></td>
+  </tr><tr class="class">
+    
+    
+    <td>Class</td>
+    <td><a href="utility.OracleSQLQueries.html">OracleSQLQueries</a></td>
+    <td><span><pre class="literalblock">
+Namespace for format()-able Oracle SQL Queries
+
+</pre></span></td>
+  </tr><tr class="class">
+    
+    
+    <td>Class</td>
+    <td><a href="utility.PostgreSQLQueries.html">PostgreSQLQueries</a></td>
+    <td><span><pre class="literalblock">
+Namespace for format()-able PostgreSQL queries.
+
+</pre></span></td>
+  </tr><tr class="class">
+    
+    
+    <td>Class</td>
+    <td><a href="utility.VerboseQuiet.html">VerboseQuiet</a></td>
+    <td><span><pre class="literalblock">
+To be inherited from.
+
+</pre></span></td>
+  </tr><tr class="class">
+    
+    
+    <td>Class</td>
+    <td><a href="utility.Task.html">Task</a></td>
+    <td><span><pre class="literalblock">
+Used for multithreading implementation.
+
+</pre></span></td>
+  </tr><tr class="function">
+    
+    
+    <td>Function</td>
+    <td><a href="utility.html#uniq">uniq</a></td>
+    <td><span><pre class="literalblock">
+uniq(iterable, key=None) --&gt; new list with unique entries
+
+</pre></span></td>
+  </tr>
+</table>
+      
+    </div>
+    
+    
+
+    <div class="function">
+  <a name="utility.invert_dict">
+    
+  </a>
+  <a name="invert_dict">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    invert_dict(d):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Switch keys with values in a dict, in case of duplicate values,
+behaviour is undefined.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="utility.get_uniq_id">
+    
+  </a>
+  <a name="get_uniq_id">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    get_uniq_id(entry, trans, only_attrs=False):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="utility.make_namedtuple_with_query">
+    
+  </a>
+  <a name="make_namedtuple_with_query">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    make_namedtuple_with_query(cursor, query, name, data):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Return &lt;data&gt; as a named tuple, called &lt;name&gt;.
+
+Create a named tuple called &lt;name&gt; using &lt;query&gt; and &lt;cursor&gt; to retreive
+the headers. Then format data with the created tuple and return it.
+
+Assumptions:
+ - The result of query yields a list/tuple of results, which contain the
+   desired name at position [1], e.g.:
+    [(SomeThing, 'col_name1'), (SomeThing, 'col_name2'), ...]
+ - Data must be iterable
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="utility.make_namedtuple_with_headers">
+    
+  </a>
+  <a name="make_namedtuple_with_headers">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    make_namedtuple_with_headers(headers, name, data):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="utility.normalize">
+    
+  </a>
+  <a name="normalize">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    normalize(s):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Some string substitutions, to make it a valid Attribute.
+
+(Not complete)
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="utility.uniq">
+    
+  </a>
+  <a name="uniq">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    uniq(l, key=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+uniq(iterable, key=None) --&gt; new list with unique entries
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div>
+    <address>
+      <a href="index.html">API Documentation</a> for cassava_ontology/chado/cx_oracle/migration/mtods/resetter/table_guru/task_storage/unittest_helper/utility, generated by <a href="https://launchpad.net/pydoctor/">pydoctor</a> at 2017-07-24 16:05:57.
+    </address>
+  </body>
+</html>

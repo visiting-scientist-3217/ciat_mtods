@@ -1,0 +1,700 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+          "DTD/xhtml1-strict.dtd">
+<html>
+  <head>
+    <title>table_guru.TableGuru : API documentation</title>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+    <link href="apidocs.css" type="text/css" rel="stylesheet" />
+    
+    
+  </head>
+  <body>
+    <h1 class="class">t.TableGuru(<a href="utility.VerboseQuiet.html">utility.VerboseQuiet</a>) : class documentation</h1>
+    <p>
+      <span id="part">Part of <a href="table_guru.html">table_guru</a></span>
+      
+      <a href="classIndex.html#table_guru.TableGuru">View In Hierarchy</a>
+    </p>
+    <div>
+      
+    </div>
+    <div class="docstring">
+      <div><pre class="literalblock">
+This guy understands those spanish Oracle databases.
+
+We get initialized with a table name, and are expected to fill some excel
+workbook, such that MainlabChadoLoader understands it.
+
+Keys in the TRANS and COLUMNS_DICT are table names from the
+Oracle database, and if existent, they return the corresponding Oracle -&gt;
+Chado translation dictionary or the columns of the Oracle table
+rspectively.
+
+The TRANS_C dict contains constanst relationships, that have to be
+populated by asking chado.
+
+All __check_and_add_*-functions return a list() of created upload-tasks.
+If none have to be added an empty list is returned.
+
+</pre><table class="fieldTable"></table></div>
+    </div>
+
+    
+    <div id="splitTables">
+      <table class="children sortable" id="id13">
+  
+  
+  <tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__init__">__init__</a></td>
+    <td><span class="undocumented">No summary</span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#get_config">get_config</a></td>
+    <td><span><pre class="literalblock">
+Returns only the (TRANS, TRANS_C) config that match the given arguments.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#create_equal_comparison">create_equal_comparison</a></td>
+    <td><span><pre class="literalblock">
+Returns functions to compare oracle objects with chado objects.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#get_translation">get_translation</a></td>
+    <td><span><pre class="literalblock">
+Returns the translation dictionary for the current self.table.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#create_upload_tasks">create_upload_tasks</a></td>
+    <td><span><pre class="literalblock">
+Multiplexer for the single rake_{table} functions.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__error_checks">__error_checks</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__setup_columns">__setup_columns</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__tostr">__tostr</a></td>
+    <td><span><pre class="literalblock">
+Formatting helper
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__check_column">__check_column</a></td>
+    <td><span><pre class="literalblock">
+Check a single entry in the currently parsed config for correcness.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__parse_translation_config">__parse_translation_config</a></td>
+    <td><span><pre class="literalblock">
+We do extensive error checking, and might throw RuntimeError.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__get_compare_f">__get_compare_f</a></td>
+    <td><span class="undocumented">No summary</span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__get_needed_data">__get_needed_data</a></td>
+    <td><span><pre class="literalblock">
+Returns data to upload as a list() of dict()'s for chado table &lt;tab&gt;, a dict() which mapps oracle column to value.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__check_and_add_cvterms">__check_and_add_cvterms</a></td>
+    <td><span><pre class="literalblock">
+Check if &lt;maybe_known&gt; cvterm-names already exist in Chado.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__check_and_add_stocks">__check_and_add_stocks</a></td>
+    <td><span><pre class="literalblock">
+Tasks to upload the genexpression information.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__check_and_add_stockprops">__check_and_add_stockprops</a></td>
+    <td><span><pre class="literalblock">
+Tasks to upload the stockprop (stock-metadata).
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__check_and_add_sites">__check_and_add_sites</a></td>
+    <td><span><pre class="literalblock">
+Creates MCL spreadsheets to upload the geolocation information.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__check_and_add_contacts">__check_and_add_contacts</a></td>
+    <td><span><pre class="literalblock">
+Creates MCL spreadsheets to upload the contact information.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__check_and_add_phenotypes">__check_and_add_phenotypes</a></td>
+    <td><span><pre class="literalblock">
+Creates MCL spreadsheets to upload the phenotyping data.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="table_guru.TableGuru.html#__get_trait_name">__get_trait_name</a></td>
+    <td><span><pre class="literalblock">
+Using self.onto.mapping, we create and return a nice trait name.
+
+</pre></span></td>
+  </tr>
+</table>
+      <invisible>
+        <p>
+          Inherited from <a href="utility.VerboseQuiet.html">VerboseQuiet</a>:
+        </p>
+        <table class="children sortable" id="id14">
+  
+  
+  <tr class="basemethod">
+    
+    
+    <td>Method</td>
+    <td><a href="utility.VerboseQuiet.html#vprint">vprint</a></td>
+    <td><span><pre class="literalblock">
+Only print stuff, if we are in verbose mode.
+
+</pre></span></td>
+  </tr><tr class="basemethod">
+    
+    
+    <td>Method</td>
+    <td><a href="utility.VerboseQuiet.html#vlog">vlog</a></td>
+    <td><span><pre class="literalblock">
+Same as vprint, but with added timestamps.
+
+</pre></span></td>
+  </tr><tr class="basemethod">
+    
+    
+    <td>Method</td>
+    <td><a href="utility.VerboseQuiet.html#qprint">qprint</a></td>
+    <td><span><pre class="literalblock">
+Only print stuff, if we are NOT in quiet mode.
+
+</pre></span></td>
+  </tr><tr class="basemethod private">
+    
+    
+    <td>Method</td>
+    <td><a href="utility.VerboseQuiet.html#__acq">__acq</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="basemethod private">
+    
+    
+    <td>Method</td>
+    <td><a href="utility.VerboseQuiet.html#__rel">__rel</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr>
+</table>
+      </invisible>
+    </div>
+    
+    
+
+    <div class="function">
+  <a name="table_guru.TableGuru.__init__">
+    
+  </a>
+  <a name="__init__">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __init__(self, table, oracledb, verbose=False, basedir='', update=True, chado_db='mcl_pheno', chado_cv='mcl_pheno', chado_dataset='mcl_pheno'):
+    
+  </div>
+  <div class="docstring functionBody">
+    <div class="interfaceinfo">overrides <a href="utility.VerboseQuiet.html#__init__">utility.VerboseQuiet.__init__</a></div>
+    <div><pre class="literalblock">
+We initialize (once per session, nor per __init__ call!)
+TableGuru.COLUMNS such that:
+    TableGuru.COLUMNS[&lt;tablename&gt;][0] -&gt; first  column name
+    TableGuru.COLUMNS[&lt;tablename&gt;][1] -&gt; second column name..
+
+And TableGuru.TRANS with empty dict()'s.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.__error_checks">
+    
+  </a>
+  <a name="__error_checks">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __error_checks(self):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.__setup_columns">
+    
+  </a>
+  <a name="__setup_columns">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __setup_columns(self):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.__tostr">
+    
+  </a>
+  <a name="__tostr">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __tostr(self, d):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Formatting helper
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.__check_column">
+    
+  </a>
+  <a name="__check_column">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __check_column(self, table, conf, entry):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Check a single entry in the currently parsed config for correcness.
+
+If we cannot handle &lt;entry&gt; for &lt;table&gt; we return False, otherwise True
+is returned.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.__parse_translation_config">
+    
+  </a>
+  <a name="__parse_translation_config">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __parse_translation_config(self):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+We do extensive error checking, and might throw RuntimeError.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.get_config">
+    
+  </a>
+  <a name="get_config">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    get_config(self, chado_table=None, oracle_column=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Returns only the (TRANS, TRANS_C) config that match the given
+arguments.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.create_equal_comparison">
+    
+  </a>
+  <a name="create_equal_comparison">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    create_equal_comparison(self, table, conf, c_conf):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Returns functions to compare oracle objects with chado objects.
+
+Functions are created only for the given table, using the given config.
+Return-order is:
+    is_eq, is_in, conf, c_conf
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.__get_compare_f">
+    
+  </a>
+  <a name="__get_compare_f">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __get_compare_f(self, table):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Using the config file, we create and return compare functions for a
+given chado table:
+    is_equal(oracle_item, chado_item)
+    is_in(oracle_item, list(chado_item[, ...]))
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.__get_needed_data">
+    
+  </a>
+  <a name="__get_needed_data">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __get_needed_data(self, tab, mapping='chado', raw=False):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Returns data to upload as a list() of dict()'s for chado table
+&lt;tab&gt;, a dict() which mapps oracle column to value.
+
+This method uses all the information we have by creating dynamic
+comparison functions based on: config files, chado and oracle
+connection.
+
+If &lt;mapping&gt; is set to 'oracle', then the returned dictionary returns
+OracleDB keys instead of chado ones. This is necessary for
+disambiguating phenotypes, as they all reference the 'phenotype.value'
+field.
+
+If &lt;raw&gt; is True, we return a second list() of dict()'s with the whole,
+unfiltered oracle table entrys.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.__check_and_add_cvterms">
+    
+  </a>
+  <a name="__check_and_add_cvterms">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __check_and_add_cvterms(self, maybe_known, f_ext=''):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Check if &lt;maybe_known&gt; cvterm-names already exist in Chado.
+
+We try to find information about the requested cvterms:
+    -1- We check ontology. If we find information, we might create more
+        than one cvterm per given cvterm-name, to comply to the chado
+        relationship schema.
+    -2- If not found(^), we create raw cvterms without description.
+
+Note that we do a case insensitive comparison while trying to find
+Ontology for a term in &lt;maybe_known&gt;.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.__check_and_add_stocks">
+    
+  </a>
+  <a name="__check_and_add_stocks">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __check_and_add_stocks(self):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Tasks to upload the genexpression information.
+
+This functions refers to the chado 'stock' table.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.__check_and_add_stockprops">
+    
+  </a>
+  <a name="__check_and_add_stockprops">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __check_and_add_stockprops(self):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Tasks to upload the stockprop (stock-metadata).
+
+This functions refers to the chado 'stockprop' table.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.__check_and_add_sites">
+    
+  </a>
+  <a name="__check_and_add_sites">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __check_and_add_sites(self):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Creates MCL spreadsheets to upload the geolocation information.
+
+This functions refers to the chado 'nd_geolocation' table.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.__check_and_add_contacts">
+    
+  </a>
+  <a name="__check_and_add_contacts">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __check_and_add_contacts(self):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Creates MCL spreadsheets to upload the contact information.
+
+This functions refers to the chado 'contact' table.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.__check_and_add_phenotypes">
+    
+  </a>
+  <a name="__check_and_add_phenotypes">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __check_and_add_phenotypes(self):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Creates MCL spreadsheets to upload the phenotyping data.
+
+This functions refers to the chado 'phenotype' table.
+Ontology comes into the playground here. (self.onto, ..)
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.__get_trait_name">
+    
+  </a>
+  <a name="__get_trait_name">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __get_trait_name(self, trait):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Using self.onto.mapping, we create and return a nice trait name.
+
+If we get a trait name, that does not exist in the Ontology, an empty
+string is returned.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.get_translation">
+    
+  </a>
+  <a name="get_translation">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    get_translation(self):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Returns the translation dictionary for the current self.table.
+
+Note that we save that stuff in static class variables, thus after the
+first invocation, we don't access that file again.
+We also do extensive error checking of that config file.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="table_guru.TableGuru.create_upload_tasks">
+    
+  </a>
+  <a name="create_upload_tasks">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    create_upload_tasks(self, max_round_fetch=600000, test=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Multiplexer for the single rake_{table} functions.
+
+Each create necessary workbooks for the specified table, save them and
+returns all their names in an array.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div>
+    <address>
+      <a href="index.html">API Documentation</a> for cassava_ontology/chado/cx_oracle/migration/mtods/resetter/table_guru/task_storage/unittest_helper/utility, generated by <a href="https://launchpad.net/pydoctor/">pydoctor</a> at 2017-07-24 16:05:57.
+    </address>
+  </body>
+</html>
