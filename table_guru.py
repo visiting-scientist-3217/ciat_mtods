@@ -79,7 +79,6 @@ class TableGuru(utility.VerboseQuiet):
         self.__error_checks()
         self.__setup_columns()
 
-
     def __error_checks(self):
         msg = 'TableGuru: Mandatory {0} not found: {1}'
         if not self.cvname in [i.name for i in self.chado.get_cv()]:
@@ -314,6 +313,7 @@ class TableGuru(utility.VerboseQuiet):
         If <raw> is True, we return a second list() of dict()'s with the whole,
         unfiltered oracle table entrys.
         '''
+        self.vlog('starting __get_needed_data for {}'.format(tab))
         if not mapping in ['chado', 'oracle']:
             msg = 'unknown <mapping> argument: {0}, must be in {1}'
             raise RuntimeError(msg.format(mapping, ['chado', 'oracle']))
@@ -476,7 +476,7 @@ class TableGuru(utility.VerboseQuiet):
         This functions refers to the chado 'stock' table.
         '''
         stocks = self.__get_needed_data('stock')
-        self.vprint('[+] stocks: {} rows'.format(len(stocks)))
+        self.vlog('stocks: {} rows'.format(len(stocks)))
 
         if stocks:
             stock_ns = [i['stock.name'] for i in stocks]
@@ -496,7 +496,7 @@ class TableGuru(utility.VerboseQuiet):
         This functions refers to the chado 'stockprop' table.
         '''
         stockprops, raw = self.__get_needed_data('stockprop', raw=True)
-        self.vprint('[+] stockprops: {} rows'.format(len(stockprops)))
+        self.vlog('stockprops: {} rows'.format(len(stockprops)))
         stocks = [getattr(i, self.tr_inv['stock.name']) for i in raw]
 
         if not stockprops:
@@ -539,14 +539,14 @@ class TableGuru(utility.VerboseQuiet):
 
         if sites:
             sites = utility.uniq(sites) # needed! but don't know why
-            self.vprint('[+] sites: {} rows'.format(len(sites)))
+            self.vlog('sites: {} rows'.format(len(sites)))
             mandatory_cvts = ['type', 'country', 'state', 'region', 'address',
                               'site_code']
             t1 = self.__check_and_add_cvterms(mandatory_cvts, f_ext='pre_sites')
             t2 = self.linker.create_geolocation(sites)
             return (t1, t2)
         else:
-            self.vprint('[+] sites: {} rows'.format(len(sites)))
+            self.vlog('sites: {} rows'.format(len(sites)))
 
     def __check_and_add_contacts(self):
         '''Creates MCL spreadsheets to upload the contact information.
@@ -556,7 +556,7 @@ class TableGuru(utility.VerboseQuiet):
         tasks = []
 
         contacts = self.__get_needed_data('contact')
-        self.vprint('[+] contacts: {} rows'.format(len(contacts)))
+        self.vlog('contacts: {} rows'.format(len(contacts)))
         if contacts:
             names = [i['contact.name'] for i in contacts]
             types = [i['contact.type_id'] for i in contacts]
@@ -571,7 +571,7 @@ class TableGuru(utility.VerboseQuiet):
         '''
         phenotypic_data, raw_data = \
             self.__get_needed_data('phenotype', mapping='oracle', raw=True)
-        self.vprint('[+] phenotypes: {} rows'.format(len(phenotypic_data)))
+        self.vlog('phenotypes: {} rows'.format(len(phenotypic_data)))
         if not phenotypic_data:
             return []
 
@@ -595,6 +595,7 @@ class TableGuru(utility.VerboseQuiet):
                     new.update({k : value})
             others.append(new)
 
+        self.vlog('starting to # Get the real phenotyping data into position.')
         # Get the real phenotyping data into position.
         descs = []
         attr_blacklist = []
