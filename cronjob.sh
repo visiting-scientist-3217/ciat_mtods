@@ -8,6 +8,7 @@ execute () {
     cd $MTODS_HOME
     . $CASSG_HOME/.bashrc
     . .env
+    touch ALLDB.dump
     ./resetter.py
     ./mtods.py -v
 } > $MTODS_HOME/cronjob.log 2>&1
