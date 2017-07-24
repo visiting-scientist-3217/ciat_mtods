@@ -17,8 +17,11 @@ class PostgreRestorer():
     '''Python Wrapper for the pg_dump and pg_restore cmd-line tools.'''
     c_dump = 'pg_dump -Fc {db}'
     c_drop = 'psql {db} < '+PJ_PATH+'/sql/delete.sql'
-    c_crea = ':' # dummy, cause no need for this any longer
-    c_res = 'pg_restore -j 16 --schema=chado --dbname={db} '
+    c_crea = ':' # dummy, because no longer needed
+    c_res = 'pg_restore -j 16 --schema=chado --dbname={db}'\
+        + ' --data-only --disable-triggers '
+    # analyze is recommended by pg_restore to run after any --data-only restore
+    c_anal = 'psql {db} < '+PJ_PATH+'/sql/analyze.sql'
 
     MASTERDUMP = os.path.join(os.path.expanduser('~'), 'software', 'mtods', 'ALLDB.dump')
 
@@ -75,25 +78,21 @@ class PostgreRestorer():
 
     def restore(self):
         '''Restore current chado data of our DB, returns True on success.'''
-        drop_success, crea_success, res_success = False, False, False
+        drop_done, crea_done, res_done, ana_done = [False for i in range(4)]
         for tries in range(3):
             try:
-                if not drop_success:
+                if not drop_done:
                     self.__exe_c(self.c_drop)
-                    drop_success = True
-                if not crea_success:
+                    drop_done = True
+                if not crea_done:
                     self.__exe_c(self.c_crea)
-                    crea_success = True
-                if not res_success:
-                    self.__exe_c(self.c_res + self.dumpfile) # does not work!
-                    # but it should work.. 
-                    self.__exe_c(self.c_res + self.dumpfile) # does work sometimes!
-                    # but no still not reliable..
-                    self.__exe_c(self.c_res + self.dumpfile) # fixed!
-                    # Speculations what happened here:
-                    #  - pg_restore tool can't handle chado's complexity
-                    #  - ?
-                    res_success = True
+                    crea_done = True
+                if not res_done:
+                    self.__exe_c(self.c_res + self.dumpfile)
+                    res_done = True
+                if not ana_done:
+                    self.__exe_c(self.c_anal)
+                    ana_done = True
                 break
             except Exception as e:
                 print '[.restore] failed cuz {}'.format(e)

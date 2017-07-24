@@ -1,0 +1,16 @@
+ANALYZE project;
+ANALYZE study;
+ANALYZE genotype;
+ANALYZE contact;
+ANALYZE organism;
+ANALYZE phenotype;
+ANALYZE stockprop;
+ANALYZE stock;
+ANALYZE nd_experiment_phenotype;
+ANALYZE nd_experiment_stock;
+ANALYZE nd_experiment;
+ANALYZE nd_geolocation;
+ANALYZE cvterm;
+ANALYZE dbxref;
+ANALYZE db;
+ANALYZE cv;

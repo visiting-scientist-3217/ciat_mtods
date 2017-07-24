@@ -17,13 +17,15 @@ monkey.patch_all() # Needs to be executed before threading, because the
 import threading
 from collections import namedtuple
 from re import sub
+import datetime
 
 class Duplicate():
     def __init__(self, index):
         self.index = index
 
 def invert_dict(d):
-    '''Switch keys with values in a dict.'''
+    '''Switch keys with values in a dict, in case of duplicate values,
+    behaviour is undefined.'''
     new = {}
     for k,v in d.iteritems():
         new.update({v:k})
@@ -153,7 +155,11 @@ class VerboseQuiet(object):
             self.__acq()
             print s
             self.__rel()
-
+    def vlog(self, what):
+        '''Same as vprint, but with added timestamps.'''
+        if self.VERBOSE:
+            now = datetime.datetime.now()
+            self.vprint('[{0}] {1}'.format(now, what))
     def qprint(self, s):
         '''Only print stuff, if we are NOT in quiet mode.'''
         if not self.QUIET:

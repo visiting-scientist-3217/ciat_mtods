@@ -277,7 +277,7 @@ class BigTest(unittest.TestCase):
     longMessage = True 
 
     # Number of Oracle rows used. If 'None' all data will be imported.
-    NTEST = None
+    NTEST = 1000
 
     def step10_stateful_setup(self):
         self.done_pg_backup = False
