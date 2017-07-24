@@ -443,7 +443,7 @@ class ChadoDataLinker(object):
         # TableGuru, now we have to insert it here..
         if not definition and self.onto:
             definition = []
-            fmt = 'Trait Description: {0}\nMethod Description: {1}'
+            fmt = 'Trait Description: {0}; Method Description: {1}'
             get_desc = lambda x: fmt.format(x[0].TRAIT_DESCRIPTION,
                                             x[0].METHOD_DESCRIPTION)
             get_trait = lambda x: x[0].TRAIT_NAME

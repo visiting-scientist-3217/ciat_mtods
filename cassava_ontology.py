@@ -7,6 +7,7 @@ We need to know this for translating the columns to their chado equivalent.
 from collections import namedtuple
 from utility import OracleSQLQueries as OSQLQ
 import utility
+import re
 
 # TODO remove this, and use utility.make_namedtuple_with_query
 def get_tabledata_as_tuple(cursor, table):
@@ -67,12 +68,13 @@ class CassavaOntology():
         self.mapping = {}
         to_remove = []
 
+        get_norm_key = lambda x: utility.normalize(x.SPANISH.upper())
         for key,value in zip(self.onto_sp, tmp_map):
             if len(value) == 0:
                 # we did not find a mapping, so this cvterm is unusable
                 to_remove.append(key)
             else:
-                self.mapping[key.SPANISH.upper()] = value
+                self.mapping[get_norm_key(key)] = value
         for term in to_remove:
             self.onto_sp.remove(term)
 

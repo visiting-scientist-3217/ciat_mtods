@@ -610,10 +610,10 @@ class TableGuru(utility.VerboseQuiet):
                     attr_blacklist.append(k)
             descs.append(new)
         if attr_blacklist:
-            msg = '[blacklist:{tab}] Consider fixing these entries in the'\
-                + ' config file or the ontology tables:\n'\
-                + '\'\'\'\n{blk}\n\'\'\'\n'
-            self.qprint(msg.format(tab=self.table, blk=attr_blacklist))
+            msg = '[blacklist:possibly-missing] Consider fixing these entries'\
+                + 'in the config file or the ontology tables:\n'\
+                + "'''\n{blk}\n'''\n"
+            self.qprint(msg.format(blk=attr_blacklist))
 
         # Note: We create needed cvterms for the descriptors syncronously on
         # Task.execution(), as their numbers are low.
