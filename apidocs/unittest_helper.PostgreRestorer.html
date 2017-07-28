@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+          "DTD/xhtml1-strict.dtd">
+<html>
+  <head>
+    <title>unittest_helper.PostgreRestorer : API documentation</title>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+    <link href="apidocs.css" type="text/css" rel="stylesheet" />
+    
+    
+  </head>
+  <body>
+    <h1 class="class">u.PostgreRestorer : class documentation</h1>
+    <p>
+      <span id="part">Part of <a href="unittest_helper.html">unittest_helper</a></span>
+      
+      <a href="classIndex.html#unittest_helper.PostgreRestorer">View In Hierarchy</a>
+    </p>
+    <div>
+      
+    </div>
+    <div class="docstring">
+      <div><pre class="literalblock">
+Python Wrapper for the pg_dump and pg_restore cmd-line tools.
+
+</pre><table class="fieldTable"></table></div>
+    </div>
+
+    
+    <div id="splitTables">
+      <table class="children sortable" id="id17">
+  
+  
+  <tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="unittest_helper.PostgreRestorer.html#__init__">__init__</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="unittest_helper.PostgreRestorer.html#dump">dump</a></td>
+    <td><span><pre class="literalblock">
+Dump current chado data of our DB.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="unittest_helper.PostgreRestorer.html#restore">restore</a></td>
+    <td><span><pre class="literalblock">
+Restore current chado data of our DB, returns True on success.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="unittest_helper.PostgreRestorer.html#__check_masterdump">__check_masterdump</a></td>
+    <td><span><pre class="literalblock">
+Check for existence of a complete dump in the last &lt;days&gt;.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="unittest_helper.PostgreRestorer.html#__known_special_case">__known_special_case</a></td>
+    <td><span><pre class="literalblock">
+Check status and output for known (ignorable) values.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="unittest_helper.PostgreRestorer.html#__exe_c">__exe_c</a></td>
+    <td><span><pre class="literalblock">
+Print execute, and throw on non-0 return value.
+
+</pre></span></td>
+  </tr>
+</table>
+      
+    </div>
+    
+    
+
+    <div class="function">
+  <a name="unittest_helper.PostgreRestorer.__init__">
+    
+  </a>
+  <a name="__init__">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __init__(self, db='drupal7', basedir='', fname='chado.dump'):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="unittest_helper.PostgreRestorer.__check_masterdump">
+    
+  </a>
+  <a name="__check_masterdump">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __check_masterdump(self, days=2):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Check for existence of a complete dump in the last &lt;days&gt;.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="unittest_helper.PostgreRestorer.__known_special_case">
+    
+  </a>
+  <a name="__known_special_case">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __known_special_case(self, s, o):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Check status and output for known (ignorable) values.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="unittest_helper.PostgreRestorer.__exe_c">
+    
+  </a>
+  <a name="__exe_c">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __exe_c(self, cmd):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Print execute, and throw on non-0 return value.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="unittest_helper.PostgreRestorer.dump">
+    
+  </a>
+  <a name="dump">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    dump(self):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Dump current chado data of our DB.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="unittest_helper.PostgreRestorer.restore">
+    
+  </a>
+  <a name="restore">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    restore(self):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Restore current chado data of our DB, returns True on success.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div>
+    <address>
+      <a href="index.html">API Documentation</a> for cassava_ontology/chado/cx_oracle/migration/mtods/resetter/table_guru/task_storage/unittest_helper/utility, generated by <a href="https://launchpad.net/pydoctor/">pydoctor</a> at 2017-07-24 16:05:57.
+    </address>
+  </body>
+</html>

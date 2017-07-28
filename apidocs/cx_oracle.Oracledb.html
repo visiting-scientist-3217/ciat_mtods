@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+          "DTD/xhtml1-strict.dtd">
+<html>
+  <head>
+    <title>cx_oracle.Oracledb : API documentation</title>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+    <link href="apidocs.css" type="text/css" rel="stylesheet" />
+    
+    
+  </head>
+  <body>
+    <h1 class="class">c.Oracledb : class documentation</h1>
+    <p>
+      <span id="part">Part of <a href="cx_oracle.html">cx_oracle</a></span>
+      
+      <a href="classIndex.html#cx_oracle.Oracledb">View In Hierarchy</a>
+    </p>
+    <div>
+      
+    </div>
+    <div class="docstring">
+      <div><pre class="literalblock">
+Simple wrapper around cx_Oracle .makedsn, .connect, and some more basic
+connection setup handling.
+
+</pre><table class="fieldTable"></table></div>
+    </div>
+
+    
+    <div id="splitTables">
+      <table class="children sortable" id="id7">
+  
+  
+  <tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="cx_oracle.Oracledb.html#__init__">__init__</a></td>
+    <td><span><pre class="literalblock">
+Defaults to initialization with global variables. Note that if you provide a 'dsn', the 'host', 'port', and 'sid' argument will be discarded.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="cx_oracle.Oracledb.html#connect">connect</a></td>
+    <td><span><pre class="literalblock">
+Returns a tuple(connection_obj, cursor_obj).
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="cx_oracle.Oracledb.html#get_rows">get_rows</a></td>
+    <td><span><pre class="literalblock">
+Execute a &lt;sql&gt;-statement, returns a namedtuple.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="cx_oracle.Oracledb.html#get_first_n">get_first_n</a></td>
+    <td><span><pre class="literalblock">
+Get first N formatted items from the given query. Additional **kwargs will be used to sql.format(**kwargs).
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="cx_oracle.Oracledb.html#get_n_more">get_n_more</a></td>
+    <td><span><pre class="literalblock">
+Get N more formatted items using offset from the given query. Additional **kwargs will be used to sql.format(**kwargs).
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="cx_oracle.Oracledb.html#fetch_more">fetch_more</a></td>
+    <td><span><pre class="literalblock">
+Fetch more result from the last query, remembering the last output format.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="cx_oracle.Oracledb.html#check_duplicates">check_duplicates</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="cx_oracle.Oracledb.html#__check_lastheaders">__check_lastheaders</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="cx_oracle.Oracledb.html#__format">__format</a></td>
+    <td><span><pre class="literalblock">
+formats data as namedtuples
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="cx_oracle.Oracledb.html#__get_tab_from_kwargs">__get_tab_from_kwargs</a></td>
+    <td><span><pre class="literalblock">
+Returns kwargs['table'] if that key exists, otherwise return self.lasttable.
+
+</pre></span></td>
+  </tr>
+</table>
+      
+    </div>
+    
+    
+
+    <div class="function">
+  <a name="cx_oracle.Oracledb.__init__">
+    
+  </a>
+  <a name="__init__">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __init__(self, usr=USR, host=H_KAPPA, port=PORT, sid=SID_KAPPA, pw='', schema=SCHEMA, dsn=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Defaults to initialization with global variables.
+Note that if you provide a 'dsn', the 'host', 'port', and 'sid'
+argument will be discarded.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="cx_oracle.Oracledb.connect">
+    
+  </a>
+  <a name="connect">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    connect(self):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Returns a tuple(connection_obj, cursor_obj).
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="cx_oracle.Oracledb.__check_lastheaders">
+    
+  </a>
+  <a name="__check_lastheaders">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __check_lastheaders(self, table):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="cx_oracle.Oracledb.__format">
+    
+  </a>
+  <a name="__format">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __format(self, data, table):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+formats data as namedtuples
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="cx_oracle.Oracledb.get_rows">
+    
+  </a>
+  <a name="get_rows">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    get_rows(self, sql, table=None, fetchamount=None, raw=False, save_as=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Execute a &lt;sql&gt;-statement, returns a namedtuple.
+
+If &lt;table&gt; is not given we return the raw data, else it is used to
+fetch the column headers to create the namedtuples.
+If &lt;fetchamount&gt; is given, only that amount is fetched and returned.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="cx_oracle.Oracledb.__get_tab_from_kwargs">
+    
+  </a>
+  <a name="__get_tab_from_kwargs">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __get_tab_from_kwargs(self, kwargs):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Returns kwargs['table'] if that key exists, otherwise return
+self.lasttable.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="cx_oracle.Oracledb.get_first_n">
+    
+  </a>
+  <a name="get_first_n">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    get_first_n(self, sql, n, **kwargs):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Get first N formatted items from the given query.
+Additional **kwargs will be used to sql.format(**kwargs).
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="cx_oracle.Oracledb.get_n_more">
+    
+  </a>
+  <a name="get_n_more">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    get_n_more(self, sql, n, offset=0, **kwargs):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Get N more formatted items using offset from the given query.
+Additional **kwargs will be used to sql.format(**kwargs).
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="cx_oracle.Oracledb.fetch_more">
+    
+  </a>
+  <a name="fetch_more">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    fetch_more(self, n=None, raw=False, table=None, from_saved=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Fetch more result from the last query, remembering the last output
+format.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="cx_oracle.Oracledb.check_duplicates">
+    
+  </a>
+  <a name="check_duplicates">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    check_duplicates(self, table, column):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div>
+    <address>
+      <a href="index.html">API Documentation</a> for cassava_ontology/chado/cx_oracle/migration/mtods/resetter/table_guru/task_storage/unittest_helper/utility, generated by <a href="https://launchpad.net/pydoctor/">pydoctor</a> at 2017-07-24 16:05:57.
+    </address>
+  </body>
+</html>

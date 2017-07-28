@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+          "DTD/xhtml1-strict.dtd">
+<html>
+  <head>
+    <title>chado.ChadoDataLinker : API documentation</title>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+    <link href="apidocs.css" type="text/css" rel="stylesheet" />
+    
+    
+  </head>
+  <body>
+    <h1 class="class">c.ChadoDataLinker(<span title="object">object</span>) : class documentation</h1>
+    <p>
+      <span id="part">Part of <a href="chado.html">chado</a></span>
+      
+      <a href="classIndex.html#chado.ChadoDataLinker">View In Hierarchy</a>
+    </p>
+    <div>
+      
+    </div>
+    <div class="docstring">
+      <div><pre class="literalblock">
+Links large list()s of data, ready for upload into Chado.
+
+The create_* functions return Task-objects, that when execute()d, will link
+and upload the given data into the chado schema.
+
+</pre><table class="fieldTable"></table></div>
+    </div>
+
+    
+    <div id="splitTables">
+      <table class="children sortable" id="id5">
+  
+  
+  <tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoDataLinker.html#__init__">__init__</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoDataLinker.html#create_cvterm">create_cvterm</a></td>
+    <td><span><pre class="literalblock">
+Create (possibly multiple) Tasks to upload cvterms.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoDataLinker.html#create_stock">create_stock</a></td>
+    <td><span><pre class="literalblock">
+Create (possibly multiple) Tasks to upload stocks.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoDataLinker.html#create_geolocation">create_geolocation</a></td>
+    <td><span><pre class="literalblock">
+Create (possibly multiple) Tasks to upload geolocations.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoDataLinker.html#create_stockprop">create_stockprop</a></td>
+    <td><span><pre class="literalblock">
+Create (possibly multiple) Tasks to upload stocks.
+
+</pre></span></td>
+  </tr><tr class="staticmethod">
+    
+    
+    <td>Static Method</td>
+    <td><a href="chado.ChadoDataLinker.html#make_pheno_unique">make_pheno_unique</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoDataLinker.html#create_phenotype">create_phenotype</a></td>
+    <td><span><pre class="literalblock">
+Create (possibly multiple) Tasks to upload phenotypic data.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoDataLinker.html#__get_or_create_cvterm">__get_or_create_cvterm</a></td>
+    <td><span><pre class="literalblock">
+Returns the cvterm named &lt;term&gt;, if it does not exist, we create it first.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoDataLinker.html#__check_coords">__check_coords</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoDataLinker.html#__strip_0time">__strip_0time</a></td>
+    <td><span><pre class="literalblock">
+strip time from datetime stockprops
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoDataLinker.html#__t1_create_phenoes">__t1_create_phenoes</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoDataLinker.html#__get_geo_names">__get_geo_names</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoDataLinker.html#__t2_create_experiments">__t2_create_experiments</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoDataLinker.html#__t3_link">__t3_link</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr>
+</table>
+      
+    </div>
+    
+    
+
+    <div class="function">
+  <a name="chado.ChadoDataLinker.__init__">
+    
+  </a>
+  <a name="__init__">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __init__(self, chado, dbname, cvname, onto=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoDataLinker.create_cvterm">
+    
+  </a>
+  <a name="create_cvterm">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    create_cvterm(self, cvterm, accession=, definition=, tname=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Create (possibly multiple) Tasks to upload cvterms.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoDataLinker.__get_or_create_cvterm">
+    
+  </a>
+  <a name="__get_or_create_cvterm">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __get_or_create_cvterm(self, term, acs=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Returns the cvterm named &lt;term&gt;, if it does not exist, we create it
+first.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoDataLinker.create_stock">
+    
+  </a>
+  <a name="create_stock">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    create_stock(self, stock_names, organism, stock_uniqs=None, tname=None, germplasm_t='cultivar'):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Create (possibly multiple) Tasks to upload stocks.
+
+If stock_uniqs is not given, it will be set equal to stock_names.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoDataLinker.__check_coords">
+    
+  </a>
+  <a name="__check_coords">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __check_coords(self, _, lat, lon, alt):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoDataLinker.create_geolocation">
+    
+  </a>
+  <a name="create_geolocation">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    create_geolocation(self, sites, tname=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Create (possibly multiple) Tasks to upload geolocations.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoDataLinker.__strip_0time">
+    
+  </a>
+  <a name="__strip_0time">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __strip_0time(self, ps):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+strip time from datetime stockprops
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoDataLinker.create_stockprop">
+    
+  </a>
+  <a name="create_stockprop">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    create_stockprop(self, props, ptype='', tname=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Create (possibly multiple) Tasks to upload stocks.
+
+Pass props = [['name0', 'val0'], ['name1', 'val1'], ...]
+&lt;ptype&gt; is a string, that meanst one call per property
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoDataLinker.make_pheno_unique">
+    
+  </a>
+  <a name="make_pheno_unique">
+    
+  </a>
+  <div class="functionHeader">
+    @staticmethod<br />
+    def
+    make_pheno_unique(id, name):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoDataLinker.__t1_create_phenoes">
+    
+  </a>
+  <a name="__t1_create_phenoes">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __t1_create_phenoes(self, ids, descs, tname=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoDataLinker.__get_geo_names">
+    
+  </a>
+  <a name="__get_geo_names">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __get_geo_names(self, others):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoDataLinker.__t2_create_experiments">
+    
+  </a>
+  <a name="__t2_create_experiments">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __t2_create_experiments(self, ids, descs, others, stocks, tname=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoDataLinker.__t3_link">
+    
+  </a>
+  <a name="__t3_link">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __t3_link(self, others, stocks, tname=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoDataLinker.create_phenotype">
+    
+  </a>
+  <a name="create_phenotype">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    create_phenotype(self, ids, stocks, descs, others=, genus=None, tname=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Create (possibly multiple) Tasks to upload phenotypic data.
+
+stocks - list of stock names
+descs  - list of dict's of phenotypic data
+others - list of dict's with additional information
+         e.g.: geolocation(nd_geolocation), date's(stockprop), ..
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div>
+    <address>
+      <a href="index.html">API Documentation</a> for cassava_ontology/chado/cx_oracle/migration/mtods/resetter/table_guru/task_storage/unittest_helper/utility, generated by <a href="https://launchpad.net/pydoctor/">pydoctor</a> at 2017-07-24 16:05:57.
+    </address>
+  </body>
+</html>

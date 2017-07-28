@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+          "DTD/xhtml1-strict.dtd">
+<html>
+  <head>
+    <title>migration.Migration : API documentation</title>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+    <link href="apidocs.css" type="text/css" rel="stylesheet" />
+    
+    
+  </head>
+  <body>
+    <h1 class="class">m.Migration(<a href="utility.VerboseQuiet.html">utility.VerboseQuiet</a>) : class documentation</h1>
+    <p>
+      <span id="part">Part of <a href="migration.html">migration</a></span>
+      
+      <a href="classIndex.html#migration.Migration">View In Hierarchy</a>
+    </p>
+    <div>
+      
+    </div>
+    <div class="docstring">
+      <div><pre class="literalblock">
+Handler of the migration/translation task.
+
+The attribute .only_update decides if we get all data, or only the new data
+from the Oracle database.
+
+Tasks are selected by following methods:
+    .full()             migrate all known tables
+        basedir=&lt;default:$PWD&gt;
+    .single(&lt;table&gt;)    migrate &lt;table&gt;
+
+</pre><table class="fieldTable"></table></div>
+    </div>
+
+    
+    <div id="splitTables">
+      <table class="children sortable" id="id9">
+  
+  
+  <tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="migration.Migration.html#__init__">__init__</a></td>
+    <td><span><pre class="literalblock">
+We set some configuration, connect to the database, and create a local cursor object.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="migration.Migration.html#full">full</a></td>
+    <td><span><pre class="literalblock">
+We call the table migration task for all tables in TABLES_MIGRATION_IMPLEMENTED.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="migration.Migration.html#single">single</a></td>
+    <td><span><pre class="literalblock">
+Migrates a single table, including upload if specified.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="migration.Migration.html#__get_tables">__get_tables</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr>
+</table>
+      <invisible>
+        <p>
+          Inherited from <a href="utility.VerboseQuiet.html">VerboseQuiet</a>:
+        </p>
+        <table class="children sortable" id="id10">
+  
+  
+  <tr class="basemethod">
+    
+    
+    <td>Method</td>
+    <td><a href="utility.VerboseQuiet.html#vprint">vprint</a></td>
+    <td><span><pre class="literalblock">
+Only print stuff, if we are in verbose mode.
+
+</pre></span></td>
+  </tr><tr class="basemethod">
+    
+    
+    <td>Method</td>
+    <td><a href="utility.VerboseQuiet.html#vlog">vlog</a></td>
+    <td><span><pre class="literalblock">
+Same as vprint, but with added timestamps.
+
+</pre></span></td>
+  </tr><tr class="basemethod">
+    
+    
+    <td>Method</td>
+    <td><a href="utility.VerboseQuiet.html#qprint">qprint</a></td>
+    <td><span><pre class="literalblock">
+Only print stuff, if we are NOT in quiet mode.
+
+</pre></span></td>
+  </tr><tr class="basemethod private">
+    
+    
+    <td>Method</td>
+    <td><a href="utility.VerboseQuiet.html#__acq">__acq</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="basemethod private">
+    
+    
+    <td>Method</td>
+    <td><a href="utility.VerboseQuiet.html#__rel">__rel</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr>
+</table>
+      </invisible>
+    </div>
+    
+    
+
+    <div class="function">
+  <a name="migration.Migration.__init__">
+    
+  </a>
+  <a name="__init__">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __init__(self, verbose=False, quiet=False, basedir=None, **tgargs):
+    
+  </div>
+  <div class="docstring functionBody">
+    <div class="interfaceinfo">overrides <a href="utility.VerboseQuiet.html#__init__">utility.VerboseQuiet.__init__</a></div>
+    <div><pre class="literalblock">
+We set some configuration, connect to the database, and create a
+local cursor object.
+
+Arguments:
+    verbose     print lots of debug info
+    quiet       daemon mode, be silent
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="migration.Migration.__get_tables">
+    
+  </a>
+  <a name="__get_tables">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __get_tables(self):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="migration.Migration.full">
+    
+  </a>
+  <a name="full">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    full(self):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+We call the table migration task for all tables in
+TABLES_MIGRATION_IMPLEMENTED.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="migration.Migration.single">
+    
+  </a>
+  <a name="single">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    single(self, table):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Migrates a single table, including upload if specified.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div>
+    <address>
+      <a href="index.html">API Documentation</a> for cassava_ontology/chado/cx_oracle/migration/mtods/resetter/table_guru/task_storage/unittest_helper/utility, generated by <a href="https://launchpad.net/pydoctor/">pydoctor</a> at 2017-07-24 16:05:57.
+    </address>
+  </body>
+</html>

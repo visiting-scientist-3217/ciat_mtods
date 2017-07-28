@@ -1,0 +1,697 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+          "DTD/xhtml1-strict.dtd">
+<html>
+  <head>
+    <title>chado.ChadoPostgres : API documentation</title>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+    <link href="apidocs.css" type="text/css" rel="stylesheet" />
+    
+    
+  </head>
+  <body>
+    <h1 class="class">c.ChadoPostgres(<span title="object">object</span>) : class documentation</h1>
+    <p>
+      <span id="part">Part of <a href="chado.html">chado</a></span>
+      
+      <a href="classIndex.html#chado.ChadoPostgres">View In Hierarchy</a>
+    </p>
+    <div>
+      
+    </div>
+    <div class="docstring">
+      <div><pre class="literalblock">
+You can ask questions about Chado once we have a connection to that
+database.
+
+Note: Initialization includes connection establishment to the database.
+Note: We create some methods dynamically.
+
+All 'has_'-functions return True if &lt;table&gt; contains sth. called &lt;name&gt;.
+Namely:
+    .has_{table}(name)
+        , with {table} element [self.COMMON_TABLES, 'organism',
+                                'nd_geolocation']
+
+All 'get_'-functions Return all rows from {table} as namedtuple, with
+&lt;where&gt; used as where statement. If &lt;where&gt; is empty all rows are returned.
+    .get_{table}(where='')
+        , with {table} element [self.COMMON_TABLES, 'organism',
+                                'nd_geolocation', 'nd_experiment',
+                                'dbxref', 'stockprop']
+
+</pre><table class="fieldTable"></table></div>
+    </div>
+
+    
+    <div id="splitTables">
+      <table class="children sortable" id="id4">
+  
+  
+  <tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#__init__">__init__</a></td>
+    <td><span><pre class="literalblock">
+Without host and port, we default to localhost:5432.
+
+</pre></span></td>
+  </tr><tr class="staticmethod">
+    
+    
+    <td>Static Method</td>
+    <td><a href="chado.ChadoPostgres.html#insert_into">insert_into</a></td>
+    <td><span><pre class="literalblock">
+INSERT INTO &lt;table&gt; (columns) VALUES (values)
+
+</pre></span></td>
+  </tr><tr class="staticmethod">
+    
+    
+    <td>Static Method</td>
+    <td><a href="chado.ChadoPostgres.html#fetch_y_insert_into">fetch_y_insert_into</a></td>
+    <td><span class="undocumented">No summary</span></td>
+  </tr><tr class="staticmethod">
+    
+    
+    <td>Static Method</td>
+    <td><a href="chado.ChadoPostgres.html#storage_y_insert_into">storage_y_insert_into</a></td>
+    <td><span><pre class="literalblock">
+Construct insert_into content with the &lt;values_constructor&gt; and the global TaskStorage object.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#has_genus">has_genus</a></td>
+    <td><span><pre class="literalblock">
+See __tab_contains
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#has_species">has_species</a></td>
+    <td><span><pre class="literalblock">
+See __tab_contains
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#has_nd_geolocation">has_nd_geolocation</a></td>
+    <td><span><pre class="literalblock">
+See __tab_contains
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#count_from">count_from</a></td>
+    <td><span><pre class="literalblock">
+Return row count from the given table.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#create_organism">create_organism</a></td>
+    <td><span><pre class="literalblock">
+Create an organism with the given specifications.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#delete_organism">delete_organism</a></td>
+    <td><span><pre class="literalblock">
+Deletes all organisms, with given genus and species.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#delete_cvterm">delete_cvterm</a></td>
+    <td><span><pre class="literalblock">
+Deletes all cvterms, with given name and cv.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#delete_stock">delete_stock</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#delete_geolocation">delete_geolocation</a></td>
+    <td><span><pre class="literalblock">
+&lt;keys&gt; are concatenated and "AND"-ed as =equal= conditions to the delete condition, site ist checked against 'description'.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#delete_stockprop">delete_stockprop</a></td>
+    <td><span><pre class="literalblock">
+Deletes all stockprops, with given value/type, or both.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#delete_phenotype">delete_phenotype</a></td>
+    <td><span><pre class="literalblock">
+Deletes all phenotypes, with given descriptors/values.
+
+</pre></span></td>
+  </tr><tr class="method">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#delete_nd_experiment">delete_nd_experiment</a></td>
+    <td><span class="undocumented">Undocumented</span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#__connect">__connect</a></td>
+    <td><span><pre class="literalblock">
+Establish the connection.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#__exe">__exe</a></td>
+    <td><span><pre class="literalblock">
+execute + fetchall, remembers last query and result
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#__tab_contains">__tab_contains</a></td>
+    <td><span><pre class="literalblock">
+Return True if Chado's '{table}' table contains an entry with &lt;column&gt; = &lt;name&gt;.
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#__get_rows">__get_rows</a></td>
+    <td><span><pre class="literalblock">
+Return all rows from {table} as namedtuple
+
+</pre></span></td>
+  </tr><tr class="method private">
+    
+    
+    <td>Method</td>
+    <td><a href="chado.ChadoPostgres.html#__delete_where">__delete_where</a></td>
+    <td><span><pre class="literalblock">
+DELETE FROM &lt;table&gt; WHERE &lt;condition&gt;
+
+</pre></span></td>
+  </tr>
+</table>
+      
+    </div>
+    
+    
+
+    <div class="function">
+  <a name="chado.ChadoPostgres.__init__">
+    
+  </a>
+  <a name="__init__">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __init__(self, db=DB, usr=USER, host=HOST, port=PORT):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Without host and port, we default to localhost:5432.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.__connect">
+    
+  </a>
+  <a name="__connect">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __connect(self, db, usr, host, port):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Establish the connection.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.__exe">
+    
+  </a>
+  <a name="__exe">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __exe(self, query):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+execute + fetchall, remembers last query and result
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.__tab_contains">
+    
+  </a>
+  <a name="__tab_contains">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __tab_contains(self, name, table='', column='name'):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Return True if Chado's '{table}' table contains an entry with
+&lt;column&gt; = &lt;name&gt;.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.__get_rows">
+    
+  </a>
+  <a name="__get_rows">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __get_rows(self, table='', where='', rawdata=False):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Return all rows from {table} as namedtuple
+
+&lt;where&gt; is used as where statement. If where is empty all rows are
+returned.
+If &lt;rawdata&gt; is True, we return the fetched rows as list().
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.insert_into">
+    
+  </a>
+  <a name="insert_into">
+    
+  </a>
+  <div class="functionHeader">
+    @staticmethod<br />
+    def
+    insert_into(table, values, columns=None, cursor=None, store=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+INSERT INTO &lt;table&gt; (columns) VALUES (values)
+
+kwargs:
+    columns     specify columns in values, default to all columns of
+                table
+    cursor      needed
+    store       if given must be of the form [a,b] will store the
+                RETURNING column &lt;a&gt; of the insert statement into
+                TaskStorage.b
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.fetch_y_insert_into">
+    
+  </a>
+  <a name="fetch_y_insert_into">
+    
+  </a>
+  <div class="functionHeader">
+    @staticmethod<br />
+    def
+    fetch_y_insert_into(fetch_stmt, values_constructor, *insert_args, **insert_kwargs):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Execute a query, replace insert_args[1], which are the values,
+passed to the insert_into function with the result of the
+values_constructor function function, given the the original
+insert_args[1] and the result of the fetch_stmt statement as argument.
+    args[1] = values_constructor(insert_args[1], fetch_result)
+
+&lt;insert_kwargs&gt; must contain a key called 'cursor' with a valid
+db-cursor as value.
+
+Note: We could do this as a single sql statement, but we have a lot of
+data to handle, and we don't want to construct incredebly long
+INSERT-statements. Like this we only construct moderately long
+SELECT-statements.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.storage_y_insert_into">
+    
+  </a>
+  <a name="storage_y_insert_into">
+    
+  </a>
+  <div class="functionHeader">
+    @staticmethod<br />
+    def
+    storage_y_insert_into(values_constructor, *insert_args, **insert_kwargs):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Construct insert_into content with the &lt;values_constructor&gt; and the
+global TaskStorage object.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.has_genus">
+    
+  </a>
+  <a name="has_genus">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    has_genus(self, name):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+See __tab_contains
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.has_species">
+    
+  </a>
+  <a name="has_species">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    has_species(self, name):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+See __tab_contains
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.has_nd_geolocation">
+    
+  </a>
+  <a name="has_nd_geolocation">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    has_nd_geolocation(self, name):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+See __tab_contains
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.count_from">
+    
+  </a>
+  <a name="count_from">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    count_from(self, table):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Return row count from the given table.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.create_organism">
+    
+  </a>
+  <a name="create_organism">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    create_organism(self, genus, species, abbreviation='', common_name='', comment=''):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Create an organism with the given specifications.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.__delete_where">
+    
+  </a>
+  <a name="__delete_where">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    __delete_where(self, table, condition):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+DELETE FROM &lt;table&gt; WHERE &lt;condition&gt;
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.delete_organism">
+    
+  </a>
+  <a name="delete_organism">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    delete_organism(self, genus, species):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Deletes all organisms, with given genus and species.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.delete_cvterm">
+    
+  </a>
+  <a name="delete_cvterm">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    delete_cvterm(self, name, cv=None, and_dbxref=False):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Deletes all cvterms, with given name and cv.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.delete_stock">
+    
+  </a>
+  <a name="delete_stock">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    delete_stock(self, stock, column='name'):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.delete_geolocation">
+    
+  </a>
+  <a name="delete_geolocation">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    delete_geolocation(self, site='', keys={}):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+&lt;keys&gt; are concatenated and "AND"-ed as =equal= conditions to the
+delete condition, site ist checked against 'description'.
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.delete_stockprop">
+    
+  </a>
+  <a name="delete_stockprop">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    delete_stockprop(self, val=None, type=None, keyval=None, keyvals=None, del_attr=False):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Deletes all stockprops, with given value/type, or both.
+
+If the stockprop to delete does not exist, we return silently.
+If &lt;val&gt; or &lt;type&gt; is given &lt;keyval[s]&gt; are ignored.
+if &lt;del_attr&gt; is True, we also delete the type of the stockprop
+(the cvterm).
+    keyval = {a:b}
+    keyvals = [{a:b}, {c:d}, ..]
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.delete_phenotype">
+    
+  </a>
+  <a name="delete_phenotype">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    delete_phenotype(self, uniquename=None, keyval=None, keyvals=None, del_attr=False, del_nd_exp=False):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div><pre class="literalblock">
+Deletes all phenotypes, with given descriptors/values.
+
+if &lt;uniquename&gt; is given we delete exactly that phenotype
+if &lt;del_attr&gt; is True, we also delete the type of the phenotype (the
+cvterm).
+    keyval = {a:b}
+    keyvals = [{a:b}, {c:d}, ..]
+
+</pre><table class="fieldTable"></table></div>
+  </div>
+</div><div class="function">
+  <a name="chado.ChadoPostgres.delete_nd_experiment">
+    
+  </a>
+  <a name="delete_nd_experiment">
+    
+  </a>
+  <div class="functionHeader">
+    
+    def
+    delete_nd_experiment(self, phenotype=None, stock=None):
+    
+  </div>
+  <div class="docstring functionBody">
+    
+    <div class="undocumented">Undocumented</div>
+  </div>
+</div>
+    <address>
+      <a href="index.html">API Documentation</a> for cassava_ontology/chado/cx_oracle/migration/mtods/resetter/table_guru/task_storage/unittest_helper/utility, generated by <a href="https://launchpad.net/pydoctor/">pydoctor</a> at 2017-07-24 16:05:57.
+    </address>
+  </body>
+</html>

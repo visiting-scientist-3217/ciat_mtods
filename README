@@ -26,3 +26,64 @@ Requirements:
     oracle-instaclient (oracledb library, proprietary, V11.2 or newer)
 
     cx_Oracle (python library using oracle client libraries)
+
+Common Problems:
+ (1)
+    Problem:    Filtering for a Phenotype Trait causes infinite loading.
+    Solution:   Run the "sql/analyze.sql" script in your chado schema.
+    Note:       This is automatically done, when using the cronjob.sh, but this
+                problem still occures sometimes.
+
+Example Drupal7 Views Configuration:
+ (1) Views
+    We obviously need the views_ui module.
+    Now views does not work by default with external databases, or databases in
+    namespaces, so we either crawl through a mess of patches:
+        https://www.drupal.org/node/1971160 /lacaysanderson
+    Or we just tell the databse to look in the chado namespace, if we don't
+    find something in the defaultone:
+        psql# ALTER USER drupal7 SET search_path TO public,chado;
+
+    [Edit View] -> FILTER CRITERIA -> delete all
+    [Edit View] -> FIELDS          -> delete all
+    /* add RELATIONS if necessary */
+    [Edit View] -> FIELDS          -> create the joined (cvterm)name
+    [Edit View] -> FILTER CRITERIA -> create joined (cvterm)name, selecting
+                                      RELATION accordingly
+
+ (2) Views Stock Name
+    We also want to see the Germplasm (Chado: stock.name).
+    To archive this we add 3 relations in the View-Window (if non-existent):
+        - nd_experiment_phenotype.phenotype_id -> phenotype.phenotype_id
+        - nd_experiment_stock.stock_id -> stock.stock_id
+        - experiment_id (1)-> experiment_id (2)
+    Now we can create a FIELD and a FILTER CRITERIA.
+
+ (4) Views Trait Names
+    We want a view containing Trait names and their Description.
+    [Structure] -> [Views] -> [Add-new-view]
+        * Show [Chado-cvterm] [table]
+    Join the phenotypes.
+        RELATIONSHIPS
+            cvterm_id => phenotype.attr_id
+            [Require-Relationship]
+    Remove duplicates.
+        OTHER
+            Use aggregation: Yes
+    Make it pretty.
+        FIELDS
+            ..
+        FILTER
+            ..
+
+ (3) Views Export
+    $ drush dl views_data_export
+    $ drush en views_data_export
+    Goto the view you want to add the export functionality to (chado/phenotype?)
+    Add Site -> Data Export
+        ..    -> *configure*
+        PAGER -> "all items"
+
+        Note: Do not use batched export. It might crash the export on every
+              execution.
+
